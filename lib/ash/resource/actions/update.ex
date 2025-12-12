@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Actions.Update do
   @moduledoc "Represents a update action on a resource."
 
@@ -28,7 +32,8 @@ defmodule Ash.Resource.Actions.Update do
     metadata: [],
     transaction?: true,
     touches_resources: [],
-    type: :update
+    type: :update,
+    __spark_metadata__: nil
   ]
 
   @type t :: %__MODULE__{
@@ -49,7 +54,8 @@ defmodule Ash.Resource.Actions.Update do
           skip_global_validations?: boolean,
           primary?: boolean,
           touches_resources: list(atom),
-          description: String.t() | nil
+          description: String.t() | nil,
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   import Ash.Resource.Actions.SharedOptions

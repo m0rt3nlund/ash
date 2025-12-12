@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Filter do
   # credo:disable-for-this-file Credo.Check.Readability.StrictModuleLayout
   @dialyzer {:nowarn_function, do_map: 2, map: 2}
@@ -25,7 +29,9 @@ defmodule Ash.Filter do
     Fragment,
     FromNow,
     GetPath,
+    Has,
     If,
+    Intersects,
     IsNil,
     Lazy,
     Length,
@@ -54,8 +60,7 @@ defmodule Ash.Filter do
     NotEq
   }
 
-  alias Ash.Query.{BooleanExpression, Call, Not, Ref}
-  alias Ash.Query.{Aggregate, Calculation, Function, Operator}
+  alias Ash.Query.{Aggregate, BooleanExpression, Calculation, Call, Function, Not, Operator, Ref}
 
   @custom_expressions Application.compile_env(:ash, :custom_expressions) || []
 
@@ -70,8 +75,10 @@ defmodule Ash.Filter do
     Fragment,
     FromNow,
     GetPath,
+    Has,
     IsNil,
     If,
+    Intersects,
     Lazy,
     Length,
     Minus,
@@ -191,10 +198,10 @@ defmodule Ash.Filter do
     [first_name: "Zar"],
     [last_name: "Doz"],
     [or: [
-      [high_score: [greater_than: 10]]],
+      [high_score: [greater_than: 10]],
       [high_score: [less_than: -10]]
     ]
-  ]])
+  ]]])
   ```
 
   ### Other formats
@@ -944,7 +951,69 @@ defmodule Ash.Filter do
       do: false
 
   def strict_subset_of(filter, candidate) do
-    Ash.SatSolver.strict_filter_subset(filter, candidate)
+    strict_subset(filter, candidate)
+  end
+
+  @doc "Returns true if the candidate filter returns the same or less data than the filter"
+  @spec strict_subset(t(), t()) :: boolean | :maybe
+  def strict_subset(filter, candidate) do
+    case {filter, candidate} do
+      {%{expression: nil}, %{expression: nil}} ->
+        true
+
+      {%{expression: nil}, _candidate_expr} ->
+        true
+
+      {_filter_expr, %{expression: nil}} ->
+        false
+
+      {filter, candidate} ->
+        do_strict_subset(filter, candidate)
+    end
+  end
+
+  defp do_strict_subset(filter, candidate) do
+    filter =
+      map(filter, fn
+        %Ref{} = ref ->
+          %{ref | input?: false}
+
+        other ->
+          other
+      end)
+
+    candidate =
+      map(candidate, fn
+        %Ref{} = ref ->
+          %{ref | input?: false}
+
+        other ->
+          other
+      end)
+
+    expr = BooleanExpression.new(:and, filter.expression, candidate.expression)
+
+    formula =
+      filter.resource
+      |> Ash.Expr.to_sat_expression(expr)
+      |> Crux.Formula.from_expression()
+
+    if Crux.satisfiable?(formula) do
+      expr = BooleanExpression.new(:and, Not.new(filter.expression), candidate.expression)
+
+      formula =
+        filter.resource
+        |> Ash.Expr.to_sat_expression(expr)
+        |> Crux.Formula.from_expression()
+
+      if Crux.satisfiable?(formula) do
+        :maybe
+      else
+        true
+      end
+    else
+      false
+    end
   end
 
   def strict_subset_of?(filter, candidate) do
@@ -2282,16 +2351,19 @@ defmodule Ash.Filter do
   end
 
   defp do_relationship_paths(
-         %Ash.Query.Exists{at_path: at_path, related?: related?},
+         %Ash.Query.Exists{at_path: at_path, related?: related?, expr: expression},
          false,
          with_refs?,
-         _expand_aggregates?
+         expand_aggregates?
        ) do
     if related? && !with_refs? do
       [{at_path}]
     else
       []
     end
+    |> Kernel.++(
+      parent_relationship_paths(expression, at_path, false, with_refs?, expand_aggregates?)
+    )
   end
 
   defp do_relationship_paths(
@@ -4417,22 +4489,27 @@ defmodule Ash.Filter do
       ) do
     new_resource = Ash.Resource.Info.related(context[:resource], at_path ++ path)
 
-    context = %{
-      resource: new_resource,
-      root_resource: new_resource,
-      parent_stack: [context[:root_resource] | context[:parent_stack] || []],
-      relationship_path: [],
-      public?: context[:public?],
-      input?: context[:input?],
-      data_layer: Ash.DataLayer.data_layer(new_resource)
-    }
+    if new_resource do
+      context = %{
+        resource: new_resource,
+        root_resource: new_resource,
+        parent_stack: [context[:root_resource] | context[:parent_stack] || []],
+        relationship_path: [],
+        public?: context[:public?],
+        input?: context[:input?],
+        data_layer: Ash.DataLayer.data_layer(new_resource)
+      }
 
-    case do_hydrate_refs(expr, context) do
-      {:ok, expr} ->
-        {:ok, %{exists | expr: expr}}
+      case do_hydrate_refs(expr, context) do
+        {:ok, expr} ->
+          {:ok, %{exists | expr: expr}}
 
-      other ->
-        other
+        other ->
+          other
+      end
+    else
+      {:error,
+       "No related resource at path #{inspect(at_path ++ path)} for #{inspect(context[:resource])}"}
     end
   end
 

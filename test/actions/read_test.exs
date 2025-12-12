@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Actions.ReadTest do
   @moduledoc false
   use ExUnit.Case, async: true
@@ -1000,6 +1004,21 @@ defmodule Ash.Test.Actions.ReadTest do
 
       assert result.__metadata__.tenant == "dynamic-tenant"
     end
+
+    test "after_transaction hook runs when multitenancy check fails", %{tenant1: tenant1} do
+      TenantPost
+      |> Ash.Changeset.for_create(:create, %{title: "test", contents: "yeet"}, tenant: tenant1)
+      |> Ash.create!()
+
+      query =
+        TenantPost
+        |> Ash.Query.after_transaction(fn _query, {:error, %Ash.Error.Invalid.TenantRequired{}} ->
+          {:error, "Custom error from after_transaction"}
+        end)
+
+      assert {:error, error} = Ash.read(query)
+      assert Exception.message(error) =~ "Custom error from after_transaction"
+    end
   end
 
   describe "query validations" do
@@ -1336,6 +1355,39 @@ defmodule Ash.Test.Actions.ReadTest do
   end
 
   describe "transaction hooks" do
+    test "after_transaction hook error overrides success result" do
+      Author |> Ash.Changeset.for_create(:create, %{name: "Test"}) |> Ash.create!()
+
+      query =
+        Author
+        |> Ash.Query.filter(name == "Test")
+        |> Ash.Query.after_transaction(fn _query, {:ok, _results} ->
+          {:error, "Custom error from after_transaction hook"}
+        end)
+
+      assert_raise Ash.Error.Unknown, ~r/Custom error from after_transaction hook/, fn ->
+        Ash.read!(query, action: :in_transaction)
+      end
+    end
+
+    test "after_transaction hook error overrides forbidden error" do
+      Author |> Ash.Changeset.for_create(:create, %{name: "Test"}) |> Ash.create!()
+
+      query =
+        Author
+        |> Ash.Query.filter(name == "Test")
+        |> Ash.Query.after_action(fn _query, _results ->
+          {:error, Ash.Error.Forbidden.exception([])}
+        end)
+        |> Ash.Query.after_transaction(fn _query, {:error, %Ash.Error.Forbidden{}} ->
+          {:error, "Custom error from after_transaction hook"}
+        end)
+
+      assert_raise Ash.Error.Unknown, ~r/Custom error from after_transaction hook/, fn ->
+        Ash.read!(query, action: :in_transaction)
+      end
+    end
+
     test "before_transaction hook can modify query" do
       author1 = Author |> Ash.Changeset.for_create(:create, %{name: "Test"}) |> Ash.create!()
       _author2 = Author |> Ash.Changeset.for_create(:create, %{name: "Other"}) |> Ash.create!()
@@ -1397,13 +1449,11 @@ defmodule Ash.Test.Actions.ReadTest do
           result
         end)
 
-      results = Ash.read!(query, action: :in_transaction)
-
+      author_id = author.id
+      [%{id: ^author_id}] = Ash.read!(query, action: :in_transaction)
       {resource, result_tuple} = Agent.get(agent, & &1)
       assert resource == Author
-      assert {:ok, _, _, _, _, _} = result_tuple
-      assert length(results) == 1
-      assert List.first(results).id == author.id
+      assert {:ok, [%{id: ^author_id}]} = result_tuple
     end
 
     test "after_transaction hook can modify the result" do
@@ -1412,10 +1462,9 @@ defmodule Ash.Test.Actions.ReadTest do
       query =
         Author
         |> Ash.Query.filter(name == "Test")
-        |> Ash.Query.after_transaction(fn _query,
-                                          {:ok, results, count, calc_runtime, calc_query, query} ->
+        |> Ash.Query.after_transaction(fn _query, {:ok, results} ->
           modified_results = Enum.map(results, &Map.put(&1, :__metadata__, :modified))
-          {:ok, modified_results, count, calc_runtime, calc_query, query}
+          {:ok, modified_results}
         end)
 
       results = Ash.read!(query, action: :in_transaction)
@@ -1428,6 +1477,27 @@ defmodule Ash.Test.Actions.ReadTest do
       query =
         Author
         |> Ash.Query.before_transaction(fn _query ->
+          {:error, "Intentional error"}
+        end)
+        |> Ash.Query.after_transaction(fn _query, result ->
+          Agent.update(agent, fn _ -> result end)
+          result
+        end)
+
+      assert_raise Ash.Error.Unknown, fn ->
+        Ash.read!(query, action: :in_transaction)
+      end
+
+      result = Agent.get(agent, & &1)
+      assert {:error, _} = result
+    end
+
+    test "after_transaction hook gets correct result with after_action error" do
+      agent = start_supervised!({Agent, fn -> nil end})
+
+      query =
+        Author
+        |> Ash.Query.after_action(fn _query, _records ->
           {:error, "Intentional error"}
         end)
         |> Ash.Query.after_transaction(fn _query, result ->

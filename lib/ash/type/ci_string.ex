@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Type.CiString do
   @constraints [
     max_length: [
@@ -9,7 +13,7 @@ defmodule Ash.Type.CiString do
       doc: "Enforces a minimum length on the value"
     ],
     match: [
-      type: :regex_as_mfa,
+      type: :regex,
       doc: "Enforces that the string matches a passed in regex"
     ],
     trim?: [
@@ -184,11 +188,14 @@ defmodule Ash.Type.CiString do
         end
 
       {:match, regex}, errors ->
-        # TODO: This should automatically add the "i" flag?
-        {m, f, a} = regex
-
         regex =
-          apply(m, f, a)
+          case regex do
+            {m, f, a} ->
+              apply(m, f, a)
+
+            regex ->
+              regex
+          end
 
         if String.match?(value, regex) do
           errors

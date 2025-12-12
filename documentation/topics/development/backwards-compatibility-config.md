@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+
+SPDX-License-Identifier: MIT
+-->
+
 # Backwards Compatibility Config
 
 All of these configurations are potentially breaking changes when applied
@@ -211,3 +217,18 @@ get an error even though nothing was created?"
 ### New Behavior
 
 Now, `return_errors?` and `stop_on_error?` default to `true`
+
+
+## match_v4_uuids?
+
+```elixir
+config :ash, Ash.Type.UUIDv7, match_v4_uuids?: true
+```
+
+### Old Behavior
+
+Incorrectly allowed non UUIDv7's to be loaded.
+
+### New Behavior
+
+Configuring the variable allows UUIDv4's to be loaded.

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Calculation do
   @moduledoc """
   The behaviour for defining a module calculation, and the struct for storing a defined calculation.
@@ -17,7 +21,8 @@ defmodule Ash.Resource.Calculation do
             public?: false,
             async?: false,
             sensitive?: false,
-            type: nil
+            type: nil,
+            __spark_metadata__: nil
 
   @schema [
     name: [
@@ -67,7 +72,8 @@ defmodule Ash.Resource.Calculation do
     load: [
       type: :any,
       default: [],
-      doc: "A load statement to be applied if the calculation is used."
+      doc:
+        "A load statement to be applied if the calculation is used. Only works with module-based or function-based calculations, not expression calculations."
     ],
     allow_nil?: [
       type: :boolean,
@@ -132,7 +138,8 @@ defmodule Ash.Resource.Calculation do
           sortable?: boolean,
           name: atom(),
           public?: boolean,
-          type: nil | Ash.Type.t()
+          type: nil | Ash.Type.t(),
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   @type ref :: {module(), Keyword.t()} | module()
@@ -182,6 +189,10 @@ defmodule Ash.Resource.Calculation do
   @callback calculate(records :: [Ash.Resource.record()], opts :: opts, context :: Context.t()) ::
               {:ok, [term]} | [term] | {:error, term} | :unknown
   @callback expression(opts :: opts, context :: Context.t()) :: any
+  @doc """
+  A load statement to be applied when the calculation is used.
+  Only works with module-based or function-based calculations, not expression calculations.
+  """
   @callback load(query :: Ash.Query.t(), opts :: opts, context :: Context.t()) ::
               atom | [atom] | Keyword.t()
   @callback strict_loads?() :: boolean()

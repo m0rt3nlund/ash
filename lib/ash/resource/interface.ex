@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Interface do
   @moduledoc """
   Represents a function in a resource's code interface
@@ -16,10 +20,11 @@ defmodule Ash.Resource.Interface do
     custom_inputs: [],
     exclude_inputs: [],
     default_options: [],
-    require_reference?: true
+    require_reference?: true,
+    __spark_metadata__: nil
   ]
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{__spark_metadata__: Spark.Dsl.Entity.spark_meta()}
 
   defp set_get?(definition) do
     if definition.get_by || definition.get_by_identity do

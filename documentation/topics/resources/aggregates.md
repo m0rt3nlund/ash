@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+
+SPDX-License-Identifier: MIT
+-->
+
 # Aggregates
 
 Aggregates in Ash allow for retrieving summary information over groups of related data. A simple example might be to show the "count of published posts for a user". Aggregates allow us quick and performant access to this data, in a way that supports being filtered/sorted on automatically. More aggregate types can be added, but you will be restricted to only the supported types. In cases where aggregates don't suffice, use [Calculations](/documentation/topics/resources/calculations.md), which are intended to be much more flexible.
@@ -55,8 +61,7 @@ Aggregates are loaded and filtered on in the same way that calculations are. Let
 ```elixir
 User
 |> Ash.Query.load(:count_of_posts)
-|> Map.get(:count_of_posts)
-# => 10
+# => %Ash.Query{aggregates: %{count_of_posts: %Ash.Query.Aggregate{...}}, ...}
 
 users
 |> Ash.load!(:count_of_posts)

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Calculation.Argument do
   @moduledoc "An argument to a calculation"
   defstruct allow_nil?: true,
@@ -5,7 +9,8 @@ defmodule Ash.Resource.Calculation.Argument do
             constraints: [],
             default: nil,
             name: nil,
-            type: nil
+            type: nil,
+            __spark_metadata__: nil
 
   @type t :: %__MODULE__{
           allow_nil?: boolean,
@@ -13,7 +18,8 @@ defmodule Ash.Resource.Calculation.Argument do
           constraints: keyword,
           default: any,
           name: atom,
-          type: Ash.Type.t()
+          type: Ash.Type.t(),
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   @schema [

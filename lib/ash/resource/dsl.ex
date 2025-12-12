@@ -1,7 +1,11 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Dsl do
   defmodule Filter do
     @moduledoc "Introspection target for a filter for read actions and relationships"
-    defstruct [:filter]
+    defstruct [:filter, __spark_metadata__: nil]
   end
 
   @filter %Spark.Dsl.Entity{
@@ -232,7 +236,11 @@ defmodule Ash.Resource.Dsl do
     describe: """
     Declares a `has_one` relationship. In a relational database, the foreign key would be on the *other* table.
 
-    Generally speaking, a `has_one` also implies that the destination table is unique on that foreign key.
+    Generally speaking, a `has_one` also implies that the destination table is
+    unique on that foreign key. To add a uniqueness constraint, you will need
+    to add an identity for the foreign key column on the resource which defines
+    the `belongs_to` side of the relationship. See the 
+    [identities guide](/documentation/topics/resources/identities.md) to learn more.
 
     See the [relationships guide](/documentation/topics/resources/relationships.md) for more.
     """,
@@ -906,6 +914,12 @@ defmodule Ash.Resource.Dsl do
         type: :atom,
         doc: """
         A pluralized version of the resource short_name. May be used by generators or automated tooling.
+        """
+      ],
+      atomic_validation_default_target_attribute: [
+        type: :atom,
+        doc: """
+        Overrides the attribute used when building atomic validation filters. Defaults to the first primary key attribute when not specified.
         """
       ],
       require_primary_key?: [
@@ -1594,6 +1608,12 @@ defmodule Ash.Resource.Dsl do
         doc:
           "An mfa ({module, function, args}) pointing to a function that takes a tenant and returns the attribute value",
         default: {__MODULE__, :identity, []}
+      ],
+      tenant_from_attribute: [
+        type: :mfa,
+        doc:
+          "An mfa ({module, function, args}) pointing to a function that takes an attribute value and returns the tenant. This is the inverse of `parse_attribute`.",
+        default: {__MODULE__, :identity, []}
       ]
     ]
   }
@@ -1644,6 +1664,7 @@ defmodule Ash.Resource.Dsl do
   @verifiers [
     Ash.Resource.Verifiers.ValidateRelationshipAttributesMatch,
     Ash.Resource.Verifiers.VerifyReservedCalculationArguments,
+    Ash.Resource.Verifiers.VerifyCalculations,
     Ash.Resource.Verifiers.VerifyIdentityFields,
     Ash.Resource.Verifiers.VerifyPrimaryReadActionHasNoArguments,
     Ash.Resource.Verifiers.VerifySelectedByDefault,
@@ -1658,6 +1679,7 @@ defmodule Ash.Resource.Dsl do
     Ash.Resource.Verifiers.ValidateManagedRelationshipOpts,
     Ash.Resource.Verifiers.ValidateMultitenancy,
     Ash.Resource.Verifiers.ValidatePrimaryKey,
+    Ash.Resource.Verifiers.ValidateAtomicValidationDefaultTargetAttribute,
     Ash.Resource.Verifiers.VerifyAcceptedByDomain,
     Ash.Resource.Verifiers.VerifyActionsAtomic,
     Ash.Resource.Verifiers.VerifyNotifiers,

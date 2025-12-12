@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Actions.Destroy.Bulk do
   @moduledoc false
   require Ash.Query
@@ -291,7 +295,8 @@ defmodule Ash.Actions.Destroy.Bulk do
                   actor: opts[:actor]
                 },
                 data_layer_context: opts[:data_layer_context] || %{}
-              }
+              },
+              rollback_on_error?: false
             )
           else
             {:ok,
@@ -423,7 +428,8 @@ defmodule Ash.Actions.Destroy.Bulk do
               actor: opts[:actor]
             },
             data_layer_context: opts[:data_layer_context] || %{}
-          }
+          },
+          rollback_on_error?: false
         )
         |> case do
           {:ok, bulk_result} ->
@@ -624,8 +630,7 @@ defmodule Ash.Actions.Destroy.Bulk do
                 else
                   Enum.reduce(results, {[], [], 0, notifications}, fn result,
                                                                       {results, errors,
-                                                                       error_count,
-                                                                       notifications} ->
+                                                                       error_count, notifications} ->
                     case Ash.Changeset.run_after_actions(result, atomic_changeset, []) do
                       {:error, error} ->
                         if opts[:transaction] && opts[:rollback_on_error?] do
@@ -849,7 +854,7 @@ defmodule Ash.Actions.Destroy.Bulk do
     resource = opts[:resource]
     opts = Ash.Actions.Helpers.set_opts(opts, domain)
 
-    read_action = get_read_action(resource, opts)
+    read_action = Ash.Actions.Update.Bulk.get_read_action(resource, action, opts)
 
     {context_cs, opts} =
       Ash.Actions.Helpers.set_context_and_get_opts(domain, Ash.Changeset.new(resource), opts)
@@ -989,7 +994,7 @@ defmodule Ash.Actions.Destroy.Bulk do
       fn batch ->
         pkeys = [or: Enum.map(batch, &Map.take(&1, pkey))]
 
-        read_action = get_read_action(resource, opts).name
+        read_action = Ash.Actions.Update.Bulk.get_read_action(resource, action, opts).name
 
         resource
         |> Ash.Query.for_read(read_action, %{},
@@ -1467,7 +1472,8 @@ defmodule Ash.Actions.Destroy.Bulk do
 
               [
                 Ash.Resource.set_metadata(result, %{
-                  bulk_destroy_index: changeset.context.bulk_destroy.index
+                  bulk_destroy_index: changeset.context.bulk_destroy.index,
+                  bulk_action_ref: changeset.context.bulk_destroy.ref
                 })
               ]
 
@@ -1485,7 +1491,8 @@ defmodule Ash.Actions.Destroy.Bulk do
 
               [
                 Ash.Resource.set_metadata(result, %{
-                  bulk_destroy_index: changeset.context.bulk_destroy.index
+                  bulk_destroy_index: changeset.context.bulk_destroy.index,
+                  bulk_action_ref: changeset.context.bulk_destroy.ref
                 })
               ]
 
@@ -1552,7 +1559,8 @@ defmodule Ash.Actions.Destroy.Bulk do
               actor: opts[:actor]
             },
             data_layer_context: opts[:data_layer_context] || context
-          }
+          },
+          rollback_on_error?: false
         )
         |> case do
           {:ok, result} ->
@@ -1622,7 +1630,7 @@ defmodule Ash.Actions.Destroy.Bulk do
         :bulk_destroy
       )
 
-    changesets_by_index = index_changesets(batch)
+    {changesets_by_ref, changesets_by_index} = index_changesets(batch)
 
     run_batch(
       resource,
@@ -1634,12 +1642,13 @@ defmodule Ash.Actions.Destroy.Bulk do
       domain,
       ref
     )
-    |> run_after_action_hooks(opts, domain, ref, changesets_by_index)
+    |> run_after_action_hooks(opts, domain, ref, changesets_by_ref, changesets_by_index)
     |> process_results(
       changes,
       all_changes,
       opts,
       ref,
+      changesets_by_ref,
       changesets_by_index,
       batch,
       domain,
@@ -1672,7 +1681,7 @@ defmodule Ash.Actions.Destroy.Bulk do
     |> Map.put(:domain, domain)
     |> Ash.Changeset.prepare_changeset_for_action(action, opts)
     |> Ash.Changeset.set_private_arguments_for_action(opts[:private_arguments] || %{})
-    |> Ash.Changeset.put_context(:bulk_destroy, %{index: index})
+    |> Ash.Changeset.put_context(:bulk_destroy, %{index: index, ref: make_ref()})
     |> Ash.Changeset.set_context(opts[:context] || %{})
     |> handle_params(
       Keyword.get(opts, :assume_casted?, false),
@@ -1763,12 +1772,14 @@ defmodule Ash.Actions.Destroy.Bulk do
   end
 
   defp index_changesets(batch) do
-    Enum.reduce(batch, %{}, fn changeset, changesets_by_index ->
-      Map.put(
-        changesets_by_index,
-        changeset.context.bulk_destroy.index,
-        changeset
-      )
+    Enum.reduce(batch, {%{}, %{}}, fn changeset, {by_ref, by_index} ->
+      ref = changeset.context.bulk_destroy.ref
+      index = changeset.context.bulk_destroy.index
+
+      {
+        Map.put(by_ref, ref, changeset),
+        Map.put(by_index, index, ref)
+      }
     end)
   end
 
@@ -2066,6 +2077,10 @@ defmodule Ash.Actions.Destroy.Bulk do
                          :bulk_destroy_index,
                          changeset.context.bulk_destroy.index
                        )
+                       |> Ash.Resource.put_metadata(
+                         :bulk_action_ref,
+                         changeset.context.bulk_destroy.ref
+                       )
                      ]}
 
                   {:error, error} ->
@@ -2110,10 +2125,18 @@ defmodule Ash.Actions.Destroy.Bulk do
          opts,
          domain,
          ref,
+         changesets_by_ref,
          changesets_by_index
        ) do
     Enum.flat_map(batch_results, fn result ->
-      changeset = changesets_by_index[result.__metadata__.bulk_destroy_index]
+      changeset =
+        Ash.Actions.Helpers.lookup_changeset(
+          result,
+          changesets_by_ref,
+          changesets_by_index,
+          index_key: :bulk_destroy_index,
+          ref_key: :bulk_action_ref
+        )
 
       case manage_relationships(result, domain, changeset,
              actor: opts[:actor],
@@ -2154,6 +2177,7 @@ defmodule Ash.Actions.Destroy.Bulk do
          all_changes,
          opts,
          ref,
+         changesets_by_ref,
          changesets_by_index,
          changesets,
          domain,
@@ -2164,15 +2188,24 @@ defmodule Ash.Actions.Destroy.Bulk do
     |> Ash.Actions.Update.Bulk.run_bulk_after_changes(
       all_changes,
       batch,
+      changesets_by_ref,
       changesets_by_index,
       changesets,
       opts,
       ref,
       resource,
-      :bulk_destroy_index
+      :bulk_destroy_index,
+      :bulk_action_ref
     )
     |> Enum.flat_map(fn result ->
-      changeset = changesets_by_index[result.__metadata__[:bulk_destroy_index]]
+      changeset =
+        Ash.Actions.Helpers.lookup_changeset(
+          result,
+          changesets_by_ref,
+          changesets_by_index,
+          index_key: :bulk_destroy_index,
+          ref_key: :bulk_action_ref
+        )
 
       if opts[:notify?] || opts[:return_notifications?] do
         store_notification(ref, notification(changeset, result, opts), opts)
@@ -2249,24 +2282,6 @@ defmodule Ash.Actions.Destroy.Bulk do
   end
 
   defp notification(changeset, result, opts) do
-    %Ash.Notifier.Notification{
-      resource: changeset.resource,
-      domain: changeset.domain,
-      actor: opts[:actor],
-      action: changeset.action,
-      for: Ash.Resource.Info.notifiers(changeset.resource) ++ changeset.action.notifiers,
-      data: result,
-      changeset: changeset
-    }
-  end
-
-  defp get_read_action(resource, opts) do
-    case opts[:read_action] do
-      nil ->
-        Ash.Resource.Info.primary_action!(resource, :read)
-
-      action ->
-        Ash.Resource.Info.action(resource, action)
-    end
+    Ash.Actions.Helpers.resource_notification(changeset, result, opts)
   end
 end

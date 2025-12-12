@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defprotocol Ash.ToTenant do
   @moduledoc """
-  Converts a value to a tenant. To add this to a resource, implement the protocol like so:application
+  Converts a value to a tenant.
 
-  What this should do is entirely dependent on how you've set up your tenants. This example assumes
-  that you want the tenant to be `org_\#{organization_id}`, but it could also be something like
-  `organization.schema`.
+  To add this to a resource, implement the protocol like so:
 
   ```elixir
   defmodule MyApp.Organization do
@@ -17,6 +19,10 @@ defprotocol Ash.ToTenant do
     end
   end
   ```
+
+  What this should do is entirely dependent on how you've set up your tenants. This example assumes
+  that you want the tenant to be `org_\#{organization_id}`, but it could also be something like
+  `organization.schema`.
   """
 
   @type t :: term()

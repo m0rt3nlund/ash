@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Actions.BulkUpdateManualTest do
   @moduledoc false
   use ExUnit.Case, async: false
@@ -32,20 +36,28 @@ defmodule Ash.Test.Actions.BulkUpdateManualTest do
         |> case do
           {:ok, record} ->
             record =
-              Ash.Resource.put_metadata(
-                record,
+              record
+              |> Ash.Resource.put_metadata(
                 :bulk_update_index,
                 changeset.context.bulk_update.index
+              )
+              |> Ash.Resource.put_metadata(
+                :bulk_action_ref,
+                changeset.context.bulk_update.ref
               )
 
             [{:ok, record} | results]
 
           {:ok, record, notifications} ->
             record =
-              Ash.Resource.put_metadata(
-                record,
+              record
+              |> Ash.Resource.put_metadata(
                 :bulk_update_index,
                 changeset.context.bulk_update.index
+              )
+              |> Ash.Resource.put_metadata(
+                :bulk_action_ref,
+                changeset.context.bulk_update.ref
               )
 
             [{:ok, record, notifications} | results]
@@ -76,20 +88,28 @@ defmodule Ash.Test.Actions.BulkUpdateManualTest do
         |> case do
           {:ok, record} ->
             record =
-              Ash.Resource.put_metadata(
-                record,
+              record
+              |> Ash.Resource.put_metadata(
                 :bulk_update_index,
                 changeset.context.bulk_update.index
+              )
+              |> Ash.Resource.put_metadata(
+                :bulk_action_ref,
+                changeset.context.bulk_update.ref
               )
 
             [{:ok, record} | results]
 
           {:ok, record, notifications} ->
             record =
-              Ash.Resource.put_metadata(
-                record,
+              record
+              |> Ash.Resource.put_metadata(
                 :bulk_update_index,
                 changeset.context.bulk_update.index
+              )
+              |> Ash.Resource.put_metadata(
+                :bulk_action_ref,
+                changeset.context.bulk_update.ref
               )
 
             [{:ok, record, %{notifications: notifications}} | results]
@@ -120,20 +140,28 @@ defmodule Ash.Test.Actions.BulkUpdateManualTest do
         |> case do
           {:ok, record} ->
             record =
-              Ash.Resource.put_metadata(
-                record,
+              record
+              |> Ash.Resource.put_metadata(
                 :bulk_update_index,
                 changeset.context.bulk_update.index
+              )
+              |> Ash.Resource.put_metadata(
+                :bulk_action_ref,
+                changeset.context.bulk_update.ref
               )
 
             [{:ok, record} | results]
 
           {:ok, record, _notifications} ->
             record =
-              Ash.Resource.put_metadata(
-                record,
+              record
+              |> Ash.Resource.put_metadata(
                 :bulk_update_index,
                 changeset.context.bulk_update.index
+              )
+              |> Ash.Resource.put_metadata(
+                :bulk_action_ref,
+                changeset.context.bulk_update.ref
               )
 
             [{:ok, record} | results]

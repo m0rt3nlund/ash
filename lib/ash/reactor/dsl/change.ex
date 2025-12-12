@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Reactor.Dsl.Change do
   @moduledoc """
   The `change` entity for the `Ash.Reactor` reactor extension.
@@ -14,7 +18,8 @@ defmodule Ash.Reactor.Dsl.Change do
             name: nil,
             only_when_valid?: false,
             type: :change,
-            where: []
+            where: [],
+            __spark_metadata__: nil
 
   @type t :: %__MODULE__{
           __identifier__: any,
@@ -27,7 +32,8 @@ defmodule Ash.Reactor.Dsl.Change do
           initial: nil | Reactor.Template.t(),
           name: atom(),
           type: :change,
-          where: [Ash.Resource.Validation.ref()]
+          where: [Ash.Resource.Validation.ref()],
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   @doc false

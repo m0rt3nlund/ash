@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Actions.Destroy do
   @moduledoc "Represents a destroy action on a resource."
 
@@ -27,7 +31,8 @@ defmodule Ash.Resource.Actions.Destroy do
     reject: [],
     transaction?: true,
     metadata: [],
-    type: :destroy
+    type: :destroy,
+    __spark_metadata__: nil
   ]
 
   @type t :: %__MODULE__{
@@ -48,7 +53,8 @@ defmodule Ash.Resource.Actions.Destroy do
           skip_global_validations?: boolean,
           touches_resources: list(atom),
           primary?: boolean,
-          description: String.t() | nil
+          description: String.t() | nil,
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
   import Ash.Resource.Actions.SharedOptions
 

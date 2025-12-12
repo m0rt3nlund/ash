@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Policy.FilterCheck do
   @moduledoc """
   A type of check that is represented by a filter statement
@@ -15,6 +19,12 @@ defmodule Ash.Policy.FilterCheck do
       `owner.id != 1 or is_nil(owner.id)`
       # alternatively
       `not(owner.id == 1) or is_nil(owner.id)`
+      # All records
+      `true`
+      # No records
+      `false`
+      # Keyword syntax (id == 1)
+      [id: 1]
 
   By being able to customize the `reject` filter, you can use related filters in your policies. Without it,
   they will likely have undesired effects.
@@ -400,7 +410,7 @@ defmodule Ash.Policy.FilterCheck do
   end
 
   def is_filter_check?(module) do
-    :erlang.function_exported(module, :filter, 1)
+    :erlang.function_exported(module, :filter, 3)
   end
 
   @doc false

@@ -1,8 +1,12 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Error.Invalid.NoSuchInput do
   @moduledoc "Used when an input is provided to an action or calculation that is not accepted"
 
   use Splode.Error,
-    fields: [:calculation, :resource, :action, :input, :inputs, did_you_mean: []],
+    fields: [:calculation, :resource, :action, :input, inputs: [], did_you_mean: []],
     class: :invalid
 
   def exception(opts) do

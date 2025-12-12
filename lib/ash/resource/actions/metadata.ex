@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Actions.Metadata do
   @moduledoc "Represents metadata from an action"
   defstruct [
@@ -6,10 +10,11 @@ defmodule Ash.Resource.Actions.Metadata do
     :name,
     :default,
     :description,
-    constraints: []
+    constraints: [],
+    __spark_metadata__: nil
   ]
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{__spark_metadata__: Spark.Dsl.Entity.spark_meta()}
 
   def schema do
     [

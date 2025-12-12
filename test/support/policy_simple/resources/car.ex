@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Support.PolicySimple.Car do
   @moduledoc false
   use Ash.Resource,
@@ -72,6 +76,10 @@ defmodule Ash.Test.Support.PolicySimple.Car do
     end
 
     policy [action_type(:read), always()] do
+      authorize_if always()
+    end
+
+    policy action_type([]) do
       authorize_if always()
     end
   end

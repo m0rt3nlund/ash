@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Calculation.Expression do
   @moduledoc false
   use Ash.Resource.Calculation
@@ -65,7 +69,7 @@ defmodule Ash.Resource.Calculation.Expression do
               {:cont, {:ok, [value | values]}}
 
             :unknown ->
-              {:halt, :unknown}
+              {:cont, {:ok, [nil | values]}}
 
             {:error, error} ->
               {:halt, {:error, error}}

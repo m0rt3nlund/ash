@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Type.Keyword do
   @constraints [
     fields: [
@@ -58,7 +62,7 @@ defmodule Ash.Type.Keyword do
   @moduledoc """
   Represents a keyword list, stored as a `:map` in the database.
 
-  A builtin type that can be referenced via `:keyword_list`
+  A builtin type that can be referenced via `:keyword`
 
   #{Spark.Options.docs(@constraints)}
   """
@@ -157,7 +161,7 @@ defmodule Ash.Type.Keyword do
 
   def dump_to_native(value, _) do
     if Keyword.keyword?(value) do
-      {:ok, Keyword.new(value)}
+      {:ok, Map.new(value)}
     else
       :error
     end

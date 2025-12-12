@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Type.KeywordTest do
   use ExUnit.Case, async: true
 
@@ -465,5 +469,24 @@ defmodule Type.KeywordTest do
     # There should be additional errors for type casting failures
     # The exact error messages may vary but we should have more than just the missing field
     assert length(errors) > 1
+  end
+
+  test "dump_to_native converts keyword list to map" do
+    keyword_list = [foo: "bar", baz: 42]
+    assert Ash.Type.Keyword.dump_to_native(keyword_list, []) == {:ok, %{foo: "bar", baz: 42}}
+  end
+
+  test "dump_to_native handles nil" do
+    assert Ash.Type.Keyword.dump_to_native(nil, []) == {:ok, nil}
+  end
+
+  test "dump_to_native handles maps" do
+    map = %{foo: "bar", baz: 42}
+    assert Ash.Type.Keyword.dump_to_native(map, []) == {:ok, map}
+  end
+
+  test "dump_to_native returns error for invalid input" do
+    assert Ash.Type.Keyword.dump_to_native("invalid", []) == :error
+    assert Ash.Type.Keyword.dump_to_native(123, []) == :error
   end
 end

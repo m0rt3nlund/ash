@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.DataLayer do
   @moduledoc """
   The behaviour for backing resource actions with persistence layers.
@@ -83,6 +87,8 @@ defmodule Ash.DataLayer do
           | {:query_aggregate, Ash.Query.Aggregate.kind()}
           | :select
           | :expr_error
+          | :calculate
+          | :expression_calculation
           | :expression_calculation_sort
           | :aggregate_filter
           | :aggregate_sort
@@ -107,6 +113,7 @@ defmodule Ash.DataLayer do
           | {:sort, Ash.Type.t()}
           | :upsert
           | :composite_primary_key
+          | :bulk_upsert_return_skipped
 
   @type lateral_join_link ::
           {Ash.Resource.t(), atom, atom, Ash.Resource.Relationships.relationship()}
@@ -120,6 +127,8 @@ defmodule Ash.DataLayer do
               {:ok, data_layer_query()} | {:error, term}
   @callback filter(data_layer_query(), Ash.Filter.t(), resource :: Ash.Resource.t()) ::
               {:ok, data_layer_query()} | {:error, term}
+
+  @callback combination_acc(data_layer_query()) :: any
   @callback sort(data_layer_query(), Ash.Sort.t(), resource :: Ash.Resource.t()) ::
               {:ok, data_layer_query()} | {:error, term}
   @callback distinct_sort(data_layer_query(), Ash.Sort.t(), resource :: Ash.Resource.t()) ::
@@ -183,6 +192,7 @@ defmodule Ash.DataLayer do
           action_select: list(atom),
           upsert_keys: nil | list(atom),
           upsert_condition: Ash.Expr.t() | nil,
+          return_skipped_upsert?: boolean,
           identity: Ash.Resource.Identity.t() | nil,
           select: list(atom),
           upsert_fields:
@@ -300,6 +310,7 @@ defmodule Ash.DataLayer do
               {:ok, data_layer_query()} | {:error, term}
 
   @optional_callbacks source: 1,
+                      combination_acc: 1,
                       run_query: 2,
                       bulk_create: 3,
                       update_query: 4,
@@ -402,34 +413,38 @@ defmodule Ash.DataLayer do
     end
   end
 
-  @doc "Wraps the execution of the function in a transaction with the resource's data_layer"
+  @doc """
+  Wraps the execution of the function in a transaction with the resource's data_layer.
+  """
   @spec transaction(
           Ash.Resource.t() | [Ash.Resource.t()],
           (-> term),
           nil | pos_integer(),
-          reason :: transaction_reason()
+          reason :: transaction_reason(),
+          opts :: Keyword.t()
         ) :: term
 
   def transaction(
         resource_or_resources,
         func,
         timeout \\ nil,
-        reason \\ %{type: :custom, metadata: %{}}
+        reason \\ %{type: :custom, metadata: %{}},
+        opts \\ []
       )
 
-  def transaction([], func, _, _reason) do
+  def transaction([], func, _, _reason, _opts) do
     {:ok, func.()}
   end
 
-  def transaction([resource], func, timeout, reason) do
-    transaction(resource, func, timeout, reason)
+  def transaction([resource], func, timeout, reason, opts) do
+    transaction(resource, func, timeout, reason, opts)
   end
 
-  def transaction([resource | resources], func, timeout, reason) do
+  def transaction([resource | resources], func, timeout, reason, opts) do
     transaction(
       resource,
       fn ->
-        case transaction(resources, func, timeout, reason) do
+        case transaction(resources, func, timeout, reason, opts) do
           {:ok, result} ->
             result
 
@@ -438,29 +453,48 @@ defmodule Ash.DataLayer do
         end
       end,
       timeout,
-      reason
+      reason,
+      opts
     )
   end
 
-  def transaction(resource, func, timeout, reason) do
+  def transaction(resource, func, timeout, reason, opts) do
+    rollback_on_error? =
+      Keyword.get(
+        opts,
+        :rollback_on_error?,
+        Application.get_env(:ash, :transaction_rollback_on_error?, false)
+      )
+
+    callback = fn ->
+      case {func.(), rollback_on_error?} do
+        {{:error, error} = result, true} ->
+          rollback(resource, error)
+          result
+
+        {result, _} ->
+          result
+      end
+    end
+
     if in_transaction?(resource) do
-      {:ok, func.()}
+      {:ok, callback.()}
     else
       data_layer = data_layer(resource)
 
       if data_layer.can?(resource, :transact) do
         cond do
           !Code.ensure_loaded?(data_layer) ->
-            data_layer.transaction(resource, func)
+            data_layer.transaction(resource, callback)
 
           function_exported?(data_layer, :transaction, 4) ->
-            data_layer.transaction(resource, func, timeout, reason)
+            data_layer.transaction(resource, callback, timeout, reason)
 
           function_exported?(data_layer, :transaction, 3) ->
-            data_layer.transaction(resource, func, timeout)
+            data_layer.transaction(resource, callback, timeout)
 
           true ->
-            data_layer.transaction(resource, func)
+            data_layer.transaction(resource, callback)
         end
       else
         {:ok, func.()}
@@ -661,6 +695,17 @@ defmodule Ash.DataLayer do
       end
     else
       {:error, "Data layer does not support combining queries"}
+    end
+  end
+
+  @spec combination_acc(data_layer_query(), Ash.Resource.t()) :: any()
+  def combination_acc(data_layer_query, resource) do
+    data_layer = Ash.DataLayer.data_layer(resource)
+
+    if function_exported?(data_layer, :combination_acc, 1) do
+      data_layer.combination_acc(data_layer_query)
+    else
+      data_layer
     end
   end
 

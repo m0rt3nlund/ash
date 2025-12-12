@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Verifiers.VerifyActionsAtomic do
   @moduledoc """
   Raises an error on update or destroy actions with `require_atomic?` set to
@@ -71,7 +75,7 @@ defmodule Ash.Resource.Verifiers.VerifyActionsAtomic do
           dsl
           |> Ash.Resource.Info.notifiers()
           |> Enum.filter(fn notifier ->
-            notifier.requires_original_data?(module, action.name)
+            notifier.requires_original_data?(module, action)
           end)
           |> case do
             [] ->

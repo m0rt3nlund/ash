@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.DataLayer.EtsTest do
   use ExUnit.Case, async: false
 
@@ -40,6 +44,7 @@ defmodule Ash.DataLayer.EtsTest do
       attribute :name, :string, public?: true
       attribute :age, :integer, public?: true
       attribute :title, :string, public?: true
+      attribute :roles, {:array, :atom}, public?: true
     end
   end
 
@@ -57,22 +62,25 @@ defmodule Ash.DataLayer.EtsTest do
   end
 
   test "won't compile with identities that don't precheck" do
-    assert_raise Spark.Error.DslError, ~r/pre_check_with/, fn ->
-      defmodule Example do
-        use Ash.Resource,
-          domain: Domain,
-          data_layer: Ash.DataLayer.Ets
+    output =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        defmodule Example do
+          use Ash.Resource,
+            domain: Domain,
+            data_layer: Ash.DataLayer.Ets
 
-        attributes do
-          uuid_primary_key :id
-          attribute :name, :string, public?: true
-        end
+          attributes do
+            uuid_primary_key :id
+            attribute :name, :string, public?: true
+          end
 
-        identities do
-          identity :unique_name, [:name]
+          identities do
+            identity :unique_name, [:name]
+          end
         end
-      end
-    end
+      end)
+
+    assert String.contains?(output, "pre_check_with")
   end
 
   test "resource_to_query" do
@@ -113,6 +121,21 @@ defmodule Ash.DataLayer.EtsTest do
     create_user(%{name: "Joe", id: id}, upsert?: true)
 
     assert [{%{id: ^id}, %EtsTestUser{name: "Joe", id: ^id}}] = user_table()
+  end
+
+  test "upsert with nil key value" do
+    %EtsTestUser{id: id} =
+      create_user(%{name: nil}, upsert?: true, upsert_identity: :unique_name)
+
+    assert [{%{id: ^id}, %EtsTestUser{id: ^id, name: nil}}] = user_table()
+
+    create_user(%{name: nil, age: 25},
+      upsert?: true,
+      upsert_identity: :unique_name
+    )
+
+    assert [{%{id: ^id}, %EtsTestUser{name: nil, age: 25}}] =
+             user_table()
   end
 
   test "destroy" do
@@ -181,10 +204,10 @@ defmodule Ash.DataLayer.EtsTest do
 
   describe "filter" do
     setup do
-      mike = create_user(%{name: "Mike", age: 37, title: "Dad"})
-      joe = create_user(%{name: "Joe", age: 11})
-      matthew = create_user(%{name: "Matthew", age: 9})
-      zachary = create_user(%{name: "Zachary", age: 6})
+      mike = create_user(%{name: "Mike", age: 37, title: "Dad", roles: [:user]})
+      joe = create_user(%{name: "Joe", age: 11, roles: [:admin, :support]})
+      matthew = create_user(%{name: "Matthew", age: 9, roles: [:admin, :manager]})
+      zachary = create_user(%{name: "Zachary", age: 6, roles: [:admin, :manager]})
       %{mike: mike, zachary: zachary, matthew: matthew, joe: joe}
     end
 
@@ -192,6 +215,22 @@ defmodule Ash.DataLayer.EtsTest do
       assert [^zachary] = strip_metadata(filter_users(name: "Zachary"))
       assert [^joe] = strip_metadata(filter_users(name: "Joe"))
       assert [^matthew] = strip_metadata(filter_users(age: 9))
+    end
+
+    test "has", %{matthew: matthew, zachary: zachary, joe: joe} do
+      assert [^joe, ^matthew, ^zachary] =
+               strip_metadata(filter_users(roles: [has: :admin]))
+
+      assert [] =
+               filter_users(roles: [has: :unknown])
+    end
+
+    test "intersects", %{matthew: matthew, zachary: zachary, joe: joe} do
+      assert [^joe, ^matthew, ^zachary] =
+               strip_metadata(filter_users(roles: [intersects: [:manager, :support]]))
+
+      assert [] =
+               filter_users(roles: [intersects: [:unknown]])
     end
 
     test "or, in, eq", %{mike: mike, zachary: zachary, joe: joe} do

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Actions.ManagedRelationships do
   @moduledoc false
   # This shouldn't be its own flow, it should use regular lifecycle hooks
@@ -42,7 +46,7 @@ defmodule Ash.Actions.ManagedRelationships do
               Enum.any?(relationships, fn {_, opts} -> opts[:authorize?] end)
 
           actor = engine_opts[:actor]
-          tenant = engine_opts[:tenant]
+          tenant = engine_opts[:tenant] || changeset.tenant
 
           case Ash.load(acc, key,
                  authorize?: authorize?,
@@ -1216,7 +1220,9 @@ defmodule Ash.Actions.ManagedRelationships do
   defp do_handle_create(record, current_value, relationship, input, changeset, actor, index, opts) do
     case opts[:on_no_match] do
       :error ->
-        if opts[:on_lookup] != :ignore do
+        # Return NotFound for modify/remove operations or when on_lookup != :ignore
+        if opts[:on_lookup] != :ignore ||
+             opts[:on_match] not in [:ignore, :error, :no_match, :missing] do
           {:error,
            NotFound.exception(
              primary_key: input,
@@ -1723,7 +1729,7 @@ defmodule Ash.Actions.ManagedRelationships do
 
         if field == relationship.destination_attribute do
           if is_struct(input) do
-            do_matches?(current_value, input, field, attr.type)
+            do_matches?(current_value, input, field, attr.type, attr.constraints)
           else
             # We know that it will be the same as all other records in this relationship
             # (because that's how has_one and has_many relationships work), so we
@@ -1731,22 +1737,22 @@ defmodule Ash.Actions.ManagedRelationships do
             true
           end
         else
-          do_matches?(current_value, input, field, attr.type)
+          do_matches?(current_value, input, field, attr.type, attr.constraints)
         end
       end)
     else
       Enum.all?(pkey, fn field ->
         attr = Ash.Resource.Info.attribute(relationship.destination, field)
-        do_matches?(current_value, input, field, attr.type)
+        do_matches?(current_value, input, field, attr.type, attr.constraints)
       end)
     end
   end
 
-  defp do_matches?(current_value, input, field, type) do
+  defp do_matches?(current_value, input, field, type, constraints) do
     with {:ok, current_val} when not is_nil(current_val) <- Map.fetch(current_value, field),
          {:ok, input_val} when not is_nil(input_val) <- fetch_field(input, field),
-         {:ok, current_val} <- Ash.Type.cast_input(type, current_val),
-         {:ok, input_val} <- Ash.Type.cast_input(type, input_val) do
+         {:ok, current_val} <- Ash.Type.cast_input(type, current_val, constraints),
+         {:ok, input_val} <- Ash.Type.cast_input(type, input_val, constraints) do
       Ash.Type.equal?(type, current_val, input_val)
     else
       _ ->
@@ -2110,6 +2116,13 @@ defmodule Ash.Actions.ManagedRelationships do
         |> Ash.Changeset.set_tenant(tenant)
         |> Ash.destroy(return_notifications?: true)
         |> case do
+          {:ok, _record, notifications} ->
+            debug_log(relationship.name, changeset, :destroy, :ok, opts[:debug?])
+
+            {:ok, notifications}
+
+            {:ok, notifications}
+
           {:ok, notifications} ->
             debug_log(relationship.name, changeset, :destroy, :ok, opts[:debug?])
 
@@ -2250,6 +2263,11 @@ defmodule Ash.Actions.ManagedRelationships do
 
             {:ok, notifications}
 
+          {:ok, _record, notifications} ->
+            debug_log(relationship.name, changeset, :destroy, :ok, opts[:debug?])
+
+            {:ok, notifications}
+
           {:error, error} ->
             debug_log(
               relationship.name,
@@ -2295,6 +2313,11 @@ defmodule Ash.Actions.ManagedRelationships do
     |> Ash.Changeset.set_tenant(tenant)
     |> Ash.destroy(return_notifications?: true)
     |> case do
+      {:ok, _record, notifications} ->
+        debug_log(relationship.name, changeset, :destroy, :ok, opts[:debug?])
+
+        {:ok, notifications}
+
       {:ok, notifications} ->
         debug_log(relationship.name, changeset, :destroy, :ok, opts[:debug?])
         {:ok, notifications}

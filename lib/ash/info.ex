@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Info do
   @moduledoc """
   General introspection helpers for Ash applications.
@@ -73,8 +77,9 @@ defmodule Ash.Info do
   """
   @spec defined_extensions(app :: Application.app()) :: [module()]
   def defined_extensions(app) do
-    app
-    |> Application.spec(:modules)
-    |> Enum.filter(&Spark.implements_behaviour?(&1, Spark.Dsl.Extension))
+    modules = Application.spec(app, :modules)
+    # Preload the modules to improve performance.
+    Code.ensure_all_loaded(modules)
+    Enum.filter(modules, &Spark.implements_behaviour?(&1, Spark.Dsl.Extension))
   end
 end

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.MixProject do
   @moduledoc false
   use Mix.Project
@@ -6,7 +10,7 @@ defmodule Ash.MixProject do
   A declarative, extensible framework for building Elixir applications.
   """
 
-  @version "3.5.39"
+  @version "3.11.1"
 
   def project do
     [
@@ -18,7 +22,11 @@ defmodule Ash.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       package: package(),
       deps: deps(),
-      dialyzer: [plt_add_apps: [:mix, :mnesia, :plug, :ex_unit, :stream_data]],
+      # Workaround for Elixir dialyzer opaque type bug: https://github.com/elixir-lang/elixir/issues/14837#issuecomment-3452772021
+      dialyzer: [
+        plt_add_apps: [:mix, :mnesia, :plug, :ex_unit, :stream_data],
+        flags: [:no_opaque]
+      ],
       docs: &docs/0,
       aliases: aliases(),
       description: @description,
@@ -291,7 +299,7 @@ defmodule Ash.MixProject do
           Ash.ProcessHelpers,
           Ash.Mix.Tasks.Helpers,
           Ash.PlugHelpers,
-          Ash.SatSolver
+          ~r/^Ash.SatSolver(\.|$)/
         ],
         Types: [
           "Ash.Type",
@@ -345,17 +353,19 @@ defmodule Ash.MixProject do
 
   defp package do
     [
-      name: :ash,
+      maintainers: [
+        "Zach Daniel <zach@zachdaniel.dev>"
+      ],
       licenses: ["MIT"],
-      maintainers: ["Zach Daniel"],
       files: ~w(lib .formatter.exs mix.exs README* LICENSE*
       CHANGELOG* usage-rules.md),
       links: %{
-        GitHub: "https://github.com/ash-project/ash",
-        Discord: "https://discord.gg/HTHRaaVPUc",
-        Website: "https://ash-hq.org",
-        Forum: "https://elixirforum.com/c/elixir-framework-forums/ash-framework-forum",
-        Changelog: "https://github.com/ash-project/ash/blob/main/CHANGELOG.md"
+        "GitHub" => "https://github.com/ash-project/ash",
+        "Changelog" => "https://github.com/ash-project/ash/blob/main/CHANGELOG.md",
+        "Discord" => "https://discord.gg/HTHRaaVPUc",
+        "Website" => "https://ash-hq.org",
+        "Forum" => "https://elixirforum.com/c/elixir-framework-forums/ash-framework-forum",
+        "REUSE Compliance" => "https://api.reuse.software/info/github.com/ash-project/ash"
       }
     ]
   end
@@ -371,7 +381,7 @@ defmodule Ash.MixProject do
     [
       {:usage_rules, "~> 0.1", only: [:dev]},
       # DSLs
-      {:spark, "~> 2.1 and >= 2.2.68"},
+      {:spark, "~> 2.3 and >= 2.3.14"},
       # Ash resources are backed by ecto scheams
       {:ecto, "~> 3.7"},
       # Used by the ETS data layer
@@ -391,11 +401,12 @@ defmodule Ash.MixProject do
       {:stream_data, "~> 1.0"},
 
       # SAT Solvers
+      {:crux, "~> 0.1 and >= 0.1.2"},
       {:picosat_elixir, "~> 0.2", optional: true},
       {:simple_sat, "~> 0.1 and >= 0.1.1", optional: true},
 
       # Code Generators
-      {:igniter, "~> 0.6 and >= 0.6.4", optional: true},
+      {:igniter, "~> 0.6 and >= 0.6.29", optional: true},
 
       # Dev/Test dependencies
       {:eflame, "~> 1.0", only: [:dev, :test]},

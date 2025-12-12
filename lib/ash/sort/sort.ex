@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Sort do
   @moduledoc """
   Utilities and types for sorting.
@@ -18,8 +22,7 @@ defmodule Ash.Sort do
           list(sort_item)
           | sort_item
 
-  alias Ash.Error.Query.UnsortableField
-  alias Ash.Error.Query.{InvalidSortOrder, NoSuchField}
+  alias Ash.Error.Query.{InvalidSortOrder, NoSuchField, UnsortableField}
 
   @doc """
   Builds an expression to be used in a sort statement. Prefer to use `Ash.Expr.calc/2` instead.

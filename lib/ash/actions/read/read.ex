@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Actions.Read do
   @moduledoc false
 
@@ -318,197 +322,216 @@ defmodule Ash.Actions.Read do
 
     reuse_values? = Keyword.get(opts, :reuse_values?, false)
 
-    {calculations_in_query, calculations_at_runtime, query} =
-      Ash.Actions.Read.Calculations.split_and_load_calculations(
-        query.domain,
-        query,
-        missing_pkeys?,
-        Keyword.fetch(opts, :initial_data),
-        reuse_values?,
-        opts[:authorize?]
-      )
+    case Ash.Actions.Read.Calculations.split_and_load_calculations(
+           query.domain,
+           query,
+           missing_pkeys?,
+           Keyword.fetch(opts, :initial_data),
+           reuse_values?,
+           opts[:authorize?]
+         ) do
+      {:error, %Ash.Query{errors: errors} = query} ->
+        {:error, Ash.Error.to_error_class(errors, query: query)}
 
-    query =
-      add_calc_context_to_query(
-        query,
-        opts[:actor],
-        opts[:authorize?],
-        query.tenant,
-        opts[:tracer],
-        query.domain,
-        expand?: false,
-        parent_stack: parent_stack_from_context(query.context),
-        source_context: query.context
-      )
+      {:error, error} ->
+        {:error, Ash.Error.to_error_class(error)}
 
-    calculations_at_runtime =
-      Enum.map(
-        calculations_at_runtime,
-        &add_calc_context(
-          &1,
-          opts[:actor],
-          opts[:authorize?],
-          query.tenant,
-          opts[:tracer],
-          query.domain,
-          query.resource,
-          parent_stack: parent_stack_from_context(query.context),
-          source_context: query.context
-        )
-      )
-
-    calculations_in_query =
-      Enum.map(
-        calculations_in_query,
-        &add_calc_context(
-          &1,
-          opts[:actor],
-          opts[:authorize?],
-          query.tenant,
-          opts[:tracer],
-          query.domain,
-          query.resource,
-          parent_stack: parent_stack_from_context(query.context),
-          source_context: query.context
-        )
-      )
-
-    source_fields =
-      if !opts[:initial_data] do
-        source_fields(query)
-      end
-
-    query =
-      if opts[:initial_data] do
-        select = source_fields(query, opts[:lazy?] && opts[:initial_data]) ++ (query.select || [])
-
-        select =
-          if reuse_values? do
-            remove_already_selected(select, opts[:initial_data])
-          else
-            select
-          end
-
-        query = %{query | select: select}
-
-        if opts[:lazy?] do
-          unload_loaded_calculations_and_aggregates(query, opts[:initial_data])
-        else
-          query
-        end
-      else
-        Ash.Query.ensure_selected(query, source_fields)
-      end
-
-    {query, stop?} = add_async_limiter(query, calculations_at_runtime, opts)
-
-    if opts[:data_layer_query?] do
-      data_layer_query(query, calculations_at_runtime, calculations_in_query, source_fields, opts)
-    else
-      try do
-        data_result =
-          if opts[:initial_data] do
-            load(
-              opts[:initial_data],
-              query,
-              calculations_at_runtime,
-              calculations_in_query,
-              missing_pkeys?,
-              opts
-            )
-          else
-            do_read(query, calculations_at_runtime, calculations_in_query, source_fields, opts)
-          end
-
-        {data_result, query_ran} =
-          case data_result do
-            {:ok, _result, _count, _calculations_at_runtime, _calculations_in_query, query} =
-                data_result ->
-              {data_result, query}
-
-            {{:error, _} = data_result, query} ->
-              {data_result, query}
-
-            data_result ->
-              {data_result, query}
-          end
-
-        query = Ash.Query.set_context(query, %{shared: query_ran.context[:shared]})
-
-        with {:ok, data, count, calculations_at_runtime, calculations_in_query, new_query} <-
-               data_result,
-             data = add_tenant(data, new_query),
-             {:ok, data} <-
-               load_through_attributes(
-                 data,
-                 %{query_ran | calculations: Map.new(calculations_in_query, &{&1.name, &1})},
-                 query.domain,
-                 opts[:actor],
-                 opts[:tracer],
-                 opts[:authorize?]
-               ),
-             {:ok, data} <-
-               load_relationships(data, query, opts),
-             {:ok, data} <-
-               Ash.Actions.Read.Calculations.run(
-                 data,
-                 query,
-                 calculations_at_runtime,
-                 calculations_in_query
-               ),
-             {:ok, data} <-
-               load_through_attributes(
-                 data,
-                 %{
-                   query
-                   | calculations: Map.new(calculations_at_runtime, &{&1.name, &1}),
-                     load_through: Map.delete(query.load_through || %{}, :attribute)
-                 },
-                 query.domain,
-                 opts[:actor],
-                 opts[:tracer],
-                 opts[:authorize?],
-                 false
-               ) do
-          data
-          |> Helpers.restrict_field_access(query)
-          |> add_tenant(new_query)
-          |> attach_fields(opts[:initial_data], initial_query, query, missing_pkeys?)
-          |> cleanup_field_auth(query)
-          |> add_page(
-            query.action,
-            count,
-            query.sort,
+      {:ok, calculations_in_query, calculations_at_runtime, query} ->
+        query =
+          add_calc_context_to_query(
             query,
-            new_query,
+            opts[:actor],
+            opts[:authorize?],
+            query.tenant,
+            opts[:tracer],
+            query.domain,
+            expand?: false,
+            parent_stack: parent_stack_from_context(query.context),
+            source_context: query.context
+          )
+
+        calculations_at_runtime =
+          Enum.map(
+            calculations_at_runtime,
+            &add_calc_context(
+              &1,
+              opts[:actor],
+              opts[:authorize?],
+              query.tenant,
+              opts[:tracer],
+              query.domain,
+              query.resource,
+              parent_stack: parent_stack_from_context(query.context),
+              source_context: query.context
+            )
+          )
+
+        calculations_in_query =
+          Enum.map(
+            calculations_in_query,
+            &add_calc_context(
+              &1,
+              opts[:actor],
+              opts[:authorize?],
+              query.tenant,
+              opts[:tracer],
+              query.domain,
+              query.resource,
+              parent_stack: parent_stack_from_context(query.context),
+              source_context: query.context
+            )
+          )
+
+        source_fields =
+          if !opts[:initial_data] do
+            source_fields(query)
+          end
+
+        query =
+          if opts[:initial_data] do
+            select =
+              source_fields(query, opts[:lazy?] && opts[:initial_data]) ++ (query.select || [])
+
+            select =
+              if reuse_values? do
+                remove_already_selected(select, opts[:initial_data])
+              else
+                select
+              end
+
+            query = %{query | select: select}
+
+            if opts[:lazy?] do
+              unload_loaded_calculations_and_aggregates(query, opts[:initial_data])
+            else
+              query
+            end
+          else
+            Ash.Query.ensure_selected(query, source_fields)
+          end
+
+        {query, stop?} = add_async_limiter(query, calculations_at_runtime, opts)
+
+        if opts[:data_layer_query?] do
+          data_layer_query(
+            query,
+            calculations_at_runtime,
+            calculations_in_query,
+            source_fields,
             opts
           )
-          |> add_query(query, opts)
         else
-          {:error, %Ash.Query{errors: errors} = query} ->
-            {:error, Ash.Error.to_error_class(errors, query: query)}
+          try do
+            data_result =
+              if opts[:initial_data] do
+                load(
+                  opts[:initial_data],
+                  query,
+                  calculations_at_runtime,
+                  calculations_in_query,
+                  missing_pkeys?,
+                  opts
+                )
+              else
+                do_read(
+                  query,
+                  calculations_at_runtime,
+                  calculations_in_query,
+                  source_fields,
+                  opts
+                )
+              end
 
-          {:error,
-           %Ash.Error.Forbidden.Placeholder{
-             authorizer: authorizer
-           }} ->
-            error =
-              Ash.Authorizer.exception(
-                authorizer,
-                :forbidden,
-                query_ran.context[:private][:authorizer_state][authorizer]
+            {data_result, query_ran} =
+              case data_result do
+                {:ok, _result, _count, _calculations_at_runtime, _calculations_in_query, query} =
+                    data_result ->
+                  {data_result, query}
+
+                {{:error, _} = data_result, query} ->
+                  {data_result, query}
+
+                data_result ->
+                  {data_result, query}
+              end
+
+            query = Ash.Query.set_context(query, %{shared: query_ran.context[:shared]})
+
+            with {:ok, data, count, calculations_at_runtime, calculations_in_query, new_query} <-
+                   data_result,
+                 data = add_tenant(data, new_query),
+                 {:ok, data} <-
+                   load_through_attributes(
+                     data,
+                     %{query_ran | calculations: Map.new(calculations_in_query, &{&1.name, &1})},
+                     query.domain,
+                     opts[:actor],
+                     opts[:tracer],
+                     opts[:authorize?]
+                   ),
+                 {:ok, data} <-
+                   load_relationships(data, query, opts),
+                 {:ok, data} <-
+                   Ash.Actions.Read.Calculations.run(
+                     data,
+                     query,
+                     calculations_at_runtime,
+                     calculations_in_query
+                   ),
+                 {:ok, data} <-
+                   load_through_attributes(
+                     data,
+                     %{
+                       query
+                       | calculations: Map.new(calculations_at_runtime, &{&1.name, &1}),
+                         load_through: Map.delete(query.load_through || %{}, :attribute)
+                     },
+                     query.domain,
+                     opts[:actor],
+                     opts[:tracer],
+                     opts[:authorize?],
+                     false
+                   ) do
+              data
+              |> Helpers.restrict_field_access(query)
+              |> add_tenant(new_query)
+              |> attach_fields(opts[:initial_data], initial_query, query, missing_pkeys?)
+              |> cleanup_field_auth(query)
+              |> add_page(
+                query.action,
+                count,
+                query.sort,
+                query,
+                new_query,
+                opts
               )
+              |> add_query(query, opts)
+            else
+              {:error, %Ash.Query{errors: errors} = query} ->
+                {:error, Ash.Error.to_error_class(errors, query: query)}
 
-            {:error, Ash.Error.to_error_class(error)}
+              {:error,
+               %Ash.Error.Forbidden.Placeholder{
+                 authorizer: authorizer
+               }} ->
+                error =
+                  Ash.Authorizer.exception(
+                    authorizer,
+                    :forbidden,
+                    query_ran.context[:private][:authorizer_state][authorizer]
+                  )
 
-          {:error, error} ->
-            {:error, Ash.Error.to_error_class(error, query: query)}
+                {:error, Ash.Error.to_error_class(error)}
+
+              {:error, error} ->
+                {:error, Ash.Error.to_error_class(error, query: query)}
+            end
+          after
+            if stop? do
+              Agent.stop(query.context[:private][:async_limiter])
+            end
+          end
         end
-      after
-        if stop? do
-          Agent.stop(query.context[:private][:async_limiter])
-        end
-      end
     end
   end
 
@@ -593,173 +616,232 @@ defmodule Ash.Actions.Read do
          } do
       case run_before_transaction_hooks(query) do
         {:ok, query} ->
-          result =
-            maybe_in_transaction(query, opts, fn notify_callback ->
-              with query_before_pagination <- query,
-                   {query, calculations_at_runtime, calculations_in_query} <-
-                     Ash.Actions.Read.Calculations.deselect_known_forbidden_fields(
-                       query,
-                       calculations_at_runtime,
-                       calculations_in_query,
-                       source_fields
-                     ),
-                   {:ok, data_layer_calculations} <-
-                     hydrate_calculations(query, calculations_in_query),
-                   {:ok, query} <- hydrate_aggregates(query),
-                   {:ok, query} <-
-                     hydrate_sort(
-                       query,
-                       opts[:actor],
-                       opts[:authorize?],
-                       query.tenant,
-                       opts[:tracer],
-                       query.domain
-                     ),
-                   {:ok, query} <-
-                     hydrate_combinations(
-                       query,
-                       opts[:actor],
-                       opts[:authorize?],
-                       query.tenant,
-                       opts[:tracer],
-                       query.domain,
-                       query.resource,
-                       expand?: true,
-                       parent_stack: parent_stack_from_context(query.context),
-                       source_context: query.context
-                     ),
-                   {:ok, relationship_path_filters} <-
-                     Ash.Filter.relationship_filters(
-                       query.domain,
-                       pre_authorization_query,
-                       opts[:actor],
-                       query.tenant,
-                       agg_refs(query, data_layer_calculations ++ [{nil, query.filter}]),
-                       opts[:authorize?]
-                     ),
-                   data_layer_calculations <-
-                     authorize_calculation_expressions(
-                       data_layer_calculations,
-                       query.resource,
-                       opts[:authorize?],
-                       relationship_path_filters,
-                       opts[:actor],
-                       query.tenant,
-                       opts[:tracer],
-                       query.domain,
-                       parent_stack_from_context(query.context),
-                       query.context
-                     ),
-                   query <-
-                     authorize_loaded_aggregates(
-                       query,
-                       relationship_path_filters,
-                       opts[:actor],
-                       opts[:authorize?],
-                       query.tenant,
-                       opts[:tracer]
-                     ),
-                   query <-
-                     authorize_sorts(
-                       query,
-                       relationship_path_filters,
-                       opts[:actor],
-                       opts[:authorize?],
-                       query.tenant,
-                       opts[:tracer]
-                     ),
-                   {:ok, filter} <-
-                     filter_with_related(
-                       query,
-                       opts[:authorize?],
-                       relationship_path_filters
-                     ),
-                   {:ok, filter} <-
-                     Filter.run_other_data_layer_filters(
-                       query.domain,
-                       query.resource,
-                       filter,
-                       query.tenant
-                     ),
-                   filter <-
-                     add_calc_context_to_filter(
-                       filter,
-                       opts[:actor],
-                       opts[:authorize?],
-                       query.tenant,
-                       opts[:tracer],
-                       query.domain,
-                       query.resource,
-                       expand?: true,
-                       parent_stack: parent_stack_from_context(query.context),
-                       source_context: query.context
-                     ),
-                   filter <-
-                     update_aggregate_filters(
-                       filter,
-                       query.resource,
-                       opts[:authorize?],
-                       relationship_path_filters,
-                       opts[:actor],
-                       query.tenant,
-                       opts[:tracer],
-                       query.domain,
-                       parent_stack_from_context(query.context),
-                       query.context
-                     ),
-                   query <- Map.put(query, :filter, filter),
-                   query <- Ash.Query.unset(query, :calculations),
-                   {%{valid?: true} = query, before_notifications} <- run_before_action(query),
-                   {:ok, count} <-
-                     fetch_count(
-                       query,
-                       query_before_pagination,
-                       relationship_path_filters,
-                       opts,
-                       true
-                     ) do
-                ensure_task_stopped(count, fn ->
-                  with {:ok, query} <- paginate(query, action, opts[:skip_pagination?]),
-                       :ok <- validate_combinations(query, calculations_at_runtime, query.load),
-                       {:ok, data_layer_query} <-
-                         Ash.Query.data_layer_query(query,
-                           data_layer_calculations: data_layer_calculations
-                         ),
-                       {{:ok, results}, query} <-
-                         run_query(
-                           set_phase(query, :executing),
-                           data_layer_query,
-                           %{
-                             actor: opts[:actor],
-                             tenant: query.tenant,
-                             authorize?: opts[:authorize?],
-                             domain: query.domain
-                           },
-                           !Keyword.has_key?(opts, :initial_data)
-                         )
-                         |> Helpers.rollback_if_in_transaction(
-                           query.resource,
-                           query
-                         ),
-                       :ok <- validate_get(results, query.action, query),
-                       results <- add_keysets(query, results, query.sort),
-                       {:ok, results} <- run_authorize_results(query, results),
-                       {:ok, results, after_notifications} <- run_after_action(query, results),
-                       {:ok, count} <- maybe_await(count, query.timeout) do
-                    notify_callback.(query, before_notifications ++ after_notifications)
-                    {:ok, results, count, calculations_at_runtime, calculations_in_query, query}
-                  else
-                    other ->
-                      handle_failed_query(other, notify_callback, query)
-                  end
-                end)
-              else
-                other ->
-                  handle_failed_query(other, notify_callback, query)
-              end
+          # Update calculation contexts with any context changes from before_transaction hooks
+          query =
+            add_calc_context_to_query(
+              query,
+              opts[:actor],
+              opts[:authorize?],
+              query.tenant,
+              opts[:tracer],
+              query.domain,
+              expand?: false,
+              parent_stack: parent_stack_from_context(query.context),
+              source_context: query.context
+            )
+
+          calculations_at_runtime =
+            Enum.map(calculations_at_runtime, fn calc ->
+              add_calc_context(
+                calc,
+                opts[:actor],
+                opts[:authorize?],
+                query.tenant,
+                opts[:tracer],
+                query.domain,
+                query.resource,
+                source_context: query.context
+              )
             end)
 
-          run_after_transaction_hooks(result, query)
+          calculations_in_query =
+            Enum.map(calculations_in_query, fn calc ->
+              add_calc_context(
+                calc,
+                opts[:actor],
+                opts[:authorize?],
+                query.tenant,
+                opts[:tracer],
+                query.domain,
+                query.resource,
+                source_context: query.context
+              )
+            end)
+
+          maybe_in_transaction(query, opts, fn notify_callback ->
+            with query_before_pagination <- query,
+                 {query, calculations_at_runtime, calculations_in_query} <-
+                   Ash.Actions.Read.Calculations.deselect_known_forbidden_fields(
+                     query,
+                     calculations_at_runtime,
+                     calculations_in_query,
+                     source_fields
+                   ),
+                 {:ok, data_layer_calculations} <-
+                   hydrate_calculations(query, calculations_in_query),
+                 {:ok, query} <- hydrate_aggregates(query),
+                 {:ok, query} <-
+                   hydrate_sort(
+                     query,
+                     opts[:actor],
+                     opts[:authorize?],
+                     query.tenant,
+                     opts[:tracer],
+                     query.domain
+                   ),
+                 {:ok, query} <-
+                   hydrate_combinations(
+                     query,
+                     opts[:actor],
+                     opts[:authorize?],
+                     query.tenant,
+                     opts[:tracer],
+                     query.domain,
+                     query.resource,
+                     expand?: true,
+                     parent_stack: parent_stack_from_context(query.context),
+                     source_context: query.context
+                   ),
+                 filter <-
+                   add_calc_context_to_filter(
+                     query.filter,
+                     opts[:actor],
+                     opts[:authorize?],
+                     query.tenant,
+                     opts[:tracer],
+                     query.domain,
+                     query.resource,
+                     expand?: true,
+                     parent_stack: parent_stack_from_context(query.context),
+                     source_context: query.context
+                   ),
+                 {:ok, relationship_path_filters} <-
+                   Ash.Filter.relationship_filters(
+                     query.domain,
+                     pre_authorization_query,
+                     opts[:actor],
+                     query.tenant,
+                     agg_refs(query, data_layer_calculations ++ [{nil, filter}]),
+                     opts[:authorize?]
+                   ),
+                 data_layer_calculations <-
+                   authorize_calculation_expressions(
+                     data_layer_calculations,
+                     query.resource,
+                     opts[:authorize?],
+                     relationship_path_filters,
+                     opts[:actor],
+                     query.tenant,
+                     opts[:tracer],
+                     query.domain,
+                     parent_stack_from_context(query.context),
+                     query.context
+                   ),
+                 query <-
+                   authorize_loaded_aggregates(
+                     query,
+                     relationship_path_filters,
+                     opts[:actor],
+                     opts[:authorize?],
+                     query.tenant,
+                     opts[:tracer]
+                   ),
+                 query <-
+                   authorize_sorts(
+                     query,
+                     relationship_path_filters,
+                     opts[:actor],
+                     opts[:authorize?],
+                     query.tenant,
+                     opts[:tracer]
+                   ),
+                 {:ok, filter} <-
+                   filter_with_related(
+                     query,
+                     opts[:authorize?],
+                     relationship_path_filters
+                   ),
+                 {:ok, filter} <-
+                   Filter.run_other_data_layer_filters(
+                     query.domain,
+                     query.resource,
+                     filter,
+                     query.tenant
+                   ),
+                 filter <-
+                   add_calc_context_to_filter(
+                     filter,
+                     opts[:actor],
+                     opts[:authorize?],
+                     query.tenant,
+                     opts[:tracer],
+                     query.domain,
+                     query.resource,
+                     expand?: true,
+                     parent_stack: parent_stack_from_context(query.context),
+                     source_context: query.context
+                   ),
+                 filter <-
+                   update_aggregate_filters(
+                     filter,
+                     query.resource,
+                     opts[:authorize?],
+                     relationship_path_filters,
+                     opts[:actor],
+                     query.tenant,
+                     opts[:tracer],
+                     query.domain,
+                     parent_stack_from_context(query.context),
+                     query.context
+                   ),
+                 query <- Map.put(query, :filter, filter),
+                 query <- Ash.Query.unset(query, :calculations),
+                 {%{valid?: true} = query, before_notifications} <- run_before_action(query),
+                 {:ok, count} <-
+                   fetch_count(
+                     query,
+                     query_before_pagination,
+                     relationship_path_filters,
+                     opts,
+                     true
+                   ) do
+              ensure_task_stopped(count, fn ->
+                with {:ok, query} <- paginate(query, action, opts[:skip_pagination?]),
+                     :ok <- validate_combinations(query, calculations_at_runtime, query.load),
+                     {:ok, data_layer_query} <-
+                       Ash.Query.data_layer_query(query,
+                         data_layer_calculations: data_layer_calculations
+                       ),
+                     {{:ok, results}, query} <-
+                       run_query(
+                         set_phase(query, :executing),
+                         data_layer_query,
+                         %{
+                           actor: opts[:actor],
+                           tenant: query.tenant,
+                           authorize?: opts[:authorize?],
+                           domain: query.domain
+                         },
+                         !Keyword.has_key?(opts, :initial_data)
+                       )
+                       |> Helpers.rollback_if_in_transaction(
+                         query.resource,
+                         query
+                       ),
+                     :ok <- validate_get(results, query.action, query),
+                     results <- add_keysets(query, results, query.sort),
+                     {:ok, results} <- run_authorize_results(query, results),
+                     {:ok, results, after_notifications} <- run_after_action(query, results),
+                     {:ok, count} <- maybe_await(count, query.timeout) do
+                  notify_callback.(query, before_notifications ++ after_notifications)
+
+                  with {:ok, results} <- run_after_transaction_hooks({:ok, results}, query) do
+                    {:ok, results, count, calculations_at_runtime, calculations_in_query, query}
+                  end
+                else
+                  other ->
+                    other
+                    |> handle_failed_query(notify_callback)
+                    |> run_after_transaction_hooks(query)
+                end
+              end)
+            else
+              other ->
+                other
+                |> handle_failed_query(notify_callback)
+                |> run_after_transaction_hooks(query)
+            end
+          end)
 
         {:error, error} ->
           error_result = {:error, error}
@@ -767,10 +849,10 @@ defmodule Ash.Actions.Read do
       end
     else
       {:ok, query} ->
-        {{:error, query}, query}
+        {run_after_transaction_hooks({:error, query}, query), query}
 
       {:error, error} ->
-        {{:error, error}, query}
+        {run_after_transaction_hooks({:error, error}, query), query}
     end
   end
 
@@ -782,11 +864,11 @@ defmodule Ash.Actions.Read do
 
   defp ensure_task_stopped(_, fun), do: fun.()
 
-  defp handle_failed_query(result, notify_callback, query) do
+  defp handle_failed_query(result, notify_callback) do
     case result do
       {%{valid?: false} = query, before_notifications} ->
         notify_callback.(query, before_notifications)
-        {{:error, query}, query}
+        {:error, query}
 
       {{:error, %Ash.Query{} = query}, _} ->
         {:error, query}
@@ -795,13 +877,13 @@ defmodule Ash.Actions.Read do
         {:error, Ash.Query.add_error(query, error)}
 
       {:ok, %Ash.Query{valid?: false} = query} ->
-        {{:error, query}, query}
+        {:error, query}
 
       %Ash.Query{} = query ->
-        {{:error, query}, query}
+        {:error, query}
 
       {:error, error} ->
-        {{:error, error}, query}
+        {:error, error}
     end
   end
 
@@ -879,13 +961,26 @@ defmodule Ash.Actions.Read do
              parent_stack: parent_stack_from_context(query.context),
              source_context: query.context
            ),
+         filter <-
+           add_calc_context_to_filter(
+             query.filter,
+             opts[:actor],
+             opts[:authorize?],
+             query.tenant,
+             opts[:tracer],
+             query.domain,
+             query.resource,
+             expand?: true,
+             parent_stack: parent_stack_from_context(query.context),
+             source_context: query.context
+           ),
          {:ok, relationship_path_filters} <-
            Ash.Filter.relationship_filters(
              query.domain,
              pre_authorization_query,
              opts[:actor],
              query.tenant,
-             agg_refs(query, data_layer_calculations ++ [{nil, query.filter}]),
+             agg_refs(query, data_layer_calculations ++ [{nil, filter}]),
              opts[:authorize?]
            ),
          data_layer_calculations <-
@@ -1170,7 +1265,7 @@ defmodule Ash.Actions.Read do
       (Enum.empty?(runtime_calculations) && Enum.empty?(load)) ||
       Enum.all?(
         Ash.Resource.Info.primary_key(query.resource),
-        &Enum.member?(fieldset, Atom.to_string(&1))
+        &Enum.member?(fieldset, &1)
       )
   end
 
@@ -1471,7 +1566,8 @@ defmodule Ash.Actions.Read do
                 action: query.action.name
               },
               data_layer_context: query.context[:data_layer]
-            }
+            },
+            rollback_on_error?: false
           )
           |> case do
             {:error, :rollback} when not is_nil(query.timeout) ->
@@ -2425,18 +2521,33 @@ defmodule Ash.Actions.Read do
             )
 
           expr =
-            Ash.Filter.move_to_relationship_path(expr, relationship_path)
+            add_calc_context_to_filter(
+              expr,
+              actor,
+              authorize?,
+              tenant,
+              tracer,
+              domain,
+              ref.resource,
+              opts
+            )
 
-          add_calc_context_to_filter(
-            expr,
-            actor,
-            authorize?,
-            tenant,
-            tracer,
-            domain,
-            ref.resource,
-            opts
-          )
+          expanded_calc = %Ash.Query.Calculation{
+            name: calc.name,
+            module: Ash.Resource.Calculation.Expression,
+            opts: [expr: expr],
+            type: calc.type,
+            constraints: calc.constraints,
+            filterable?: calc.filterable?,
+            sortable?: calc.sortable?,
+            sensitive?: calc.sensitive?,
+            load: calc.load,
+            select: calc.select,
+            context: calc.context
+          }
+
+          # Return a Ref at the relationship path with the expanded calculation
+          %{ref | attribute: expanded_calc, relationship_path: relationship_path}
         else
           %{ref | attribute: calc}
         end
@@ -2568,12 +2679,12 @@ defmodule Ash.Actions.Read do
         {:ok, handle_attribute_multitenancy(query)}
 
       :bypass ->
-        {:ok, %{query | tenant: nil, to_tenant: nil}}
+        {:ok, query}
 
       :bypass_all ->
         query = Ash.Query.set_context(query, %{shared: %{multitenancy: :bypass_all}})
 
-        {:ok, %{query | tenant: nil, to_tenant: nil}}
+        {:ok, query}
     end
     |> case do
       {:ok, query} -> handle_aggregate_multitenancy(query)
@@ -2702,22 +2813,73 @@ defmodule Ash.Actions.Read do
 
   defp handle_aggregate_multitenancy(query) do
     Enum.reduce_while(query.aggregates, {:ok, %{}}, fn {key, aggregate}, {:ok, acc} ->
-      case handle_multitenancy(
-             Ash.Query.set_tenant(aggregate.query, aggregate.query.tenant || query.tenant)
-           ) do
-        {:ok, %{valid?: true} = query} ->
-          {:cont, {:ok, Map.put(acc, key, %{aggregate | query: query})}}
-
-        {:ok, query} ->
-          {:halt, {:error, Ash.Error.set_path(query.errors, aggregate.name)}}
-
-        {:error, error} ->
-          {:halt, {:error, Ash.Error.set_path(error, aggregate.name)}}
+      with aggregate_query <-
+             apply_aggregate_tenant(aggregate.query, query.tenant, aggregate.multitenancy),
+           :ok <- validate_aggregate_multitenancy(aggregate),
+           {:ok, %{valid?: true} = q} <- handle_multitenancy(aggregate_query) do
+        {:cont, {:ok, Map.put(acc, key, %{aggregate | query: q})}}
+      else
+        {:ok, q} -> {:halt, {:error, Ash.Error.set_path(q.errors, aggregate.name)}}
+        {:error, error} -> {:halt, {:error, Ash.Error.set_path(error, aggregate.name)}}
       end
     end)
     |> case do
       {:ok, aggregates} -> {:ok, %{query | aggregates: aggregates}}
       {:error, error} -> {:error, error}
+    end
+  end
+
+  defp apply_aggregate_tenant(aggregate_query, fallback_tenant, :bypass) do
+    aggregate_query
+    |> Ash.Query.set_tenant(aggregate_query.tenant || fallback_tenant)
+    |> Ash.Query.set_context(%{shared: %{private: %{multitenancy: :bypass_all}}})
+  end
+
+  defp apply_aggregate_tenant(aggregate_query, fallback_tenant, _multitenancy) do
+    Ash.Query.set_tenant(aggregate_query, aggregate_query.tenant || fallback_tenant)
+  end
+
+  defp validate_aggregate_multitenancy(aggregate) do
+    if aggregate.multitenancy == :bypass do
+      with :ok <- validate_context_multitenancy_strategy(aggregate.resource, nil, aggregate.name) do
+        Enum.reduce_while(aggregate.relationship_path, {:ok, aggregate.resource}, fn
+          rel_name, {:ok, current_resource} ->
+            relationship = Ash.Resource.Info.relationship(current_resource, rel_name)
+
+            relationship.destination
+            |> validate_context_multitenancy_strategy(rel_name, aggregate.name)
+            |> case do
+              :ok -> {:cont, {:ok, relationship.destination}}
+              error -> {:halt, error}
+            end
+        end)
+        |> case do
+          {:ok, _} -> :ok
+          error -> error
+        end
+      end
+    else
+      :ok
+    end
+  end
+
+  # Validate context multitenancy and its relationships are not used with bypass
+  # Ref: https://github.com/ash-project/ash_postgres/pull/649#issuecomment-3536654583
+  defp validate_context_multitenancy_strategy(resource, relationship_name, aggregate_name) do
+    if Ash.Resource.Info.multitenancy_strategy(resource) == :context do
+      location = relationship_name && " in relationship `#{relationship_name}`"
+
+      {:error,
+       Ash.Error.Query.InvalidQuery.exception(
+         field: aggregate_name,
+         message: """
+         Aggregate `#{aggregate_name}` uses `multitenancy: :bypass` but resource \
+         `#{inspect(resource)}`#{location} uses `:context` multitenancy strategy. \
+         Multitenancy bypass only supports `:attribute` strategy.
+         """
+       )}
+    else
+      :ok
     end
   end
 
@@ -4800,6 +4962,10 @@ defmodule Ash.Actions.Read do
   defp set_phase(query, phase \\ :preparing)
        when phase in ~w[preparing before_action after_action executing around_transaction]a,
        do: %{query | phase: phase}
+
+  defp get_shared_multitenancy(%{context: %{private: %{multitenancy: multitenancy}}}) do
+    multitenancy
+  end
 
   defp get_shared_multitenancy(%{context: %{multitenancy: multitenancy}}) do
     multitenancy

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+
+SPDX-License-Identifier: MIT
+-->
+
 # Writing Extensions
 
 Extensions allow you to make powerful modifications to DSL entities. If you are using `AshPostgres`, `AshGraphql` or `AshJsonApi`, they are all integrated into Ash using extensions. In this guide we will build a simple extension for `Ash.Resource` that adds timestamps to your resource. We'll also show some simple patterns that can help ensure that all of your resources are using your extension.
@@ -171,7 +177,7 @@ Then we would configure that this base resource exists, with
 
 Now in our resources instead of `use Ash.Resource`, we say `use MyApp.Resource`.
 
-Use `mix ash.gen.base_resource` to create one of these.:w
+Use `mix ash.gen.base_resource` to create one of these.
 
 This pattern is relatively limited, good for simple things like making sure that all
 of our resources use a particular extension. See the section above on extensions for the

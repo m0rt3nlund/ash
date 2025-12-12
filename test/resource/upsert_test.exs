@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Resource.UpsertTest do
   @moduledoc false
   use ExUnit.Case, async: true
@@ -272,6 +276,23 @@ defmodule Ash.Test.Resource.UpsertTest do
       assert_raise Ash.Error.Invalid, fn ->
         Product.upsert_condition!(%{name: "fred", other: "george"})
       end
+    end
+  end
+
+  describe "upsert with false condition" do
+    test "upsert with expr(false) condition fails on conflict" do
+      # Create initial product
+      Product.upsert!(%{name: "John", other: "initial"})
+
+      # This should fail because the upsert_condition is false
+      assert {:error, _} =
+               Product
+               |> Ash.Changeset.for_create(:create, %{name: "John", other: "updated"},
+                 upsert?: true,
+                 upsert_identity: :unique_name,
+                 upsert_condition: expr(false)
+               )
+               |> Ash.create()
     end
   end
 end

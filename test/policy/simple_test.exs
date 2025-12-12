@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Policy.SimpleTest do
   @doc false
   use ExUnit.Case
@@ -121,6 +125,42 @@ defmodule Ash.Test.Policy.SimpleTest do
     end
   end
 
+  defmodule ConditionalAccessCheckBroken do
+    use Ash.Policy.FilterCheck
+
+    @impl true
+    def describe(_opts) do
+      "conditional access based on actor level"
+    end
+
+    @impl true
+    def filter(actor, _context, _opts) do
+      case actor[:level] do
+        :full -> true
+        :partial -> expr(access_level != :confidential)
+        _ -> false
+      end
+    end
+  end
+
+  defmodule ConditionalAccessCheckFixed do
+    use Ash.Policy.FilterCheck
+
+    @impl true
+    def describe(_opts) do
+      "conditional access based on actor level"
+    end
+
+    @impl true
+    def filter(actor, _context, _opts) do
+      case actor[:level] do
+        :full -> expr(true)
+        :partial -> expr(access_level != :confidential)
+        _ -> expr(false)
+      end
+    end
+  end
+
   defmodule ResourceWithFailedFilterTest do
     use Ash.Resource,
       domain: Ash.Test.Domain,
@@ -156,6 +196,97 @@ defmodule Ash.Test.Policy.SimpleTest do
       belongs_to :self, __MODULE__ do
         source_attribute :id
         destination_attribute :id
+      end
+    end
+  end
+
+  defmodule ResourceWithMixedActionTypePolicy do
+    use Ash.Resource,
+      domain: Ash.Test.Domain,
+      data_layer: Ash.DataLayer.Ets,
+      authorizers: [Ash.Policy.Authorizer]
+
+    ets do
+      private? true
+    end
+
+    attributes do
+      uuid_primary_key :id
+      attribute :name, :string, public?: true, allow_nil?: false
+    end
+
+    actions do
+      defaults [:read, :destroy, create: [:name], update: [:name]]
+    end
+
+    policies do
+      policy action_type([:create, :read, :update, :destroy]) do
+        authorize_if actor_present()
+      end
+    end
+  end
+
+  defmodule ResourceWithBrokenConditionalCheck do
+    @moduledoc """
+    This resource intentionally has a trailing bypass to reproduce the bug
+    where returning raw `true` from a FilterCheck causes all records to be
+    filtered out when there's a trailing bypass.
+    """
+    use Ash.Resource,
+      domain: Ash.Test.Domain,
+      data_layer: Ash.DataLayer.Ets,
+      authorizers: [Ash.Policy.Authorizer]
+
+    ets do
+      private? true
+    end
+
+    attributes do
+      uuid_primary_key :id
+      attribute :access_level, :atom, public?: true
+    end
+
+    actions do
+      defaults [:read, create: [:access_level]]
+    end
+
+    policies do
+      policy action_type(:read) do
+        authorize_if ConditionalAccessCheckBroken
+      end
+
+      bypass actor_attribute_equals(:super_admin, true) do
+        authorize_if always()
+      end
+    end
+  end
+
+  defmodule ResourceWithFixedConditionalCheck do
+    use Ash.Resource,
+      domain: Ash.Test.Domain,
+      data_layer: Ash.DataLayer.Ets,
+      authorizers: [Ash.Policy.Authorizer]
+
+    ets do
+      private? true
+    end
+
+    attributes do
+      uuid_primary_key :id
+      attribute :access_level, :atom, public?: true
+    end
+
+    actions do
+      defaults [:read, create: [:access_level]]
+    end
+
+    policies do
+      bypass actor_attribute_equals(:super_admin, true) do
+        authorize_if always()
+      end
+
+      policy action_type(:read) do
+        authorize_if ConditionalAccessCheckFixed
       end
     end
   end
@@ -267,6 +398,64 @@ defmodule Ash.Test.Policy.SimpleTest do
              |> Ash.Query.new()
              |> Ash.DataLayer.Simple.set_data([%{thing | id: Ash.UUID.generate()}])
              |> Ash.read!(actor: %{admin: true})
+  end
+
+  defmodule ResourceWithBypassAndStrictPolicy do
+    use Ash.Resource,
+      domain: Ash.Test.Domain,
+      data_layer: Ash.DataLayer.Ets,
+      authorizers: [Ash.Policy.Authorizer]
+
+    ets do
+      private? true
+    end
+
+    attributes do
+      uuid_primary_key :id
+      attribute :name, :string, public?: true
+    end
+
+    actions do
+      defaults [:read, create: [:name]]
+    end
+
+    policies do
+      # Bypass that won't apply to regular users
+      bypass always() do
+        authorize_if actor_attribute_equals(:admin, true)
+      end
+
+      # Strict policy that requires admin
+      policy action_type(:read) do
+        access_type :strict
+        authorize_if actor_attribute_equals(:admin, true)
+      end
+    end
+  end
+
+  test "strict policy without matching bypass returns forbidden instead of empty list", %{
+    user: user,
+    admin: admin
+  } do
+    # Create some records
+    ResourceWithBypassAndStrictPolicy
+    |> Ash.Changeset.for_create(:create, %{name: "test1"})
+    |> Ash.create!(authorize?: false)
+
+    ResourceWithBypassAndStrictPolicy
+    |> Ash.Changeset.for_create(:create, %{name: "test2"})
+    |> Ash.create!(authorize?: false)
+
+    # Admin should be able to read via bypass
+    assert [_, _] = Ash.read!(ResourceWithBypassAndStrictPolicy, actor: admin)
+
+    # Non-admin user should get forbidden error, NOT empty list
+    # This reproduces the issue where strict policies were incorrectly
+    # returning 200 with empty data instead of 403 forbidden
+    assert_raise Ash.Error.Forbidden, fn ->
+      ResourceWithBypassAndStrictPolicy
+      |> Ash.read!(actor: user)
+    end
   end
 
   test "bypass with condition does not apply subsequent filters", %{admin: admin, user: user} do
@@ -655,6 +844,41 @@ defmodule Ash.Test.Policy.SimpleTest do
     assert user2_got_thing.id == user2_thing.id
   end
 
+  defmodule ResourceWithBypassAndReadPolicy do
+    use Ash.Resource,
+      domain: Ash.Test.Domain,
+      data_layer: Ash.DataLayer.Ets,
+      authorizers: [Ash.Policy.Authorizer]
+
+    ets do
+      private? true
+    end
+
+    attributes do
+      uuid_primary_key :id
+      attribute :name, :string, public?: true
+    end
+
+    actions do
+      defaults [:read]
+
+      create :create do
+        primary? true
+        accept [:name]
+      end
+    end
+
+    policies do
+      bypass always() do
+        authorize_if actor_attribute_equals(:admin, true)
+      end
+
+      policy action_type(:read) do
+        authorize_if always()
+      end
+    end
+  end
+
   defmodule ResourceWithBeforeTransactionHook do
     use Ash.Resource,
       domain: Ash.Test.Domain,
@@ -709,6 +933,28 @@ defmodule Ash.Test.Policy.SimpleTest do
     end
   end
 
+  test "bypass with only admin check should not allow non-admin creates", %{
+    user: user,
+    admin: admin
+  } do
+    # Non-admin user should not be able to create
+    assert_raise Ash.Error.Forbidden, fn ->
+      ResourceWithBypassAndReadPolicy
+      |> Ash.Changeset.for_create(:create, %{name: "test"})
+      |> Ash.create!(actor: user)
+    end
+
+    # Admin should be able to create via bypass
+    assert %{name: "admin_record"} =
+             ResourceWithBypassAndReadPolicy
+             |> Ash.Changeset.for_create(:create, %{name: "admin_record"})
+             |> Ash.create!(actor: admin)
+
+    # Both admin and non-admin should be able to read
+    assert [_] = Ash.read!(ResourceWithBypassAndReadPolicy, actor: admin)
+    assert [_] = Ash.read!(ResourceWithBypassAndReadPolicy, actor: user)
+  end
+
   test "before_transaction hook should not run when action is not authorized via bulk_update" do
     record = Ash.create!(ResourceWithBeforeTransactionHook, %{name: "test"}, authorize?: false)
 
@@ -747,6 +993,116 @@ defmodule Ash.Test.Policy.SimpleTest do
         select: [],
         load: []
       )
+    end
+  end
+
+  describe "ResourceWithMixedActionTypePolicy" do
+    test "when an actor is provided, the data is returned" do
+      data =
+        ResourceWithMixedActionTypePolicy
+        |> Ash.Changeset.for_create(:create, %{name: "Joe"}, actor: :bob, authorize?: false)
+        |> Ash.create!()
+        |> List.wrap()
+
+      assert [%{name: "Joe"}] =
+               ResourceWithMixedActionTypePolicy
+               |> Ash.DataLayer.Simple.set_data(data)
+               |> Ash.read!(actor: :bob)
+    end
+
+    test "when no actor is provided, filtering is applied as expected" do
+      data =
+        ResourceWithMixedActionTypePolicy
+        |> Ash.Changeset.for_create(:create, %{name: "Joe"}, actor: :bob, authorize?: false)
+        |> Ash.create!()
+        |> List.wrap()
+
+      assert [] =
+               ResourceWithMixedActionTypePolicy
+               |> Ash.DataLayer.Simple.set_data(data)
+               |> Ash.read!()
+    end
+  end
+
+  describe "FilterCheck with trailing bypass bug" do
+    test "returning raw true/false from FilterCheck fails with trailing bypass" do
+      public_record =
+        ResourceWithBrokenConditionalCheck
+        |> Ash.Changeset.for_create(:create, %{access_level: :public}, authorize?: false)
+        |> Ash.create!()
+
+      confidential_record =
+        ResourceWithBrokenConditionalCheck
+        |> Ash.Changeset.for_create(:create, %{access_level: :confidential}, authorize?: false)
+        |> Ash.create!()
+
+      full_actor = %{level: :full}
+
+      full_results =
+        ResourceWithBrokenConditionalCheck
+        |> Ash.read!(actor: full_actor)
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert full_results == Enum.sort([public_record.id, confidential_record.id])
+
+      partial_actor = %{level: :partial}
+
+      partial_results =
+        ResourceWithBrokenConditionalCheck
+        |> Ash.read!(actor: partial_actor)
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert partial_results == [public_record.id]
+    end
+
+    test "returning expr(true) and expr(false) from FilterCheck works correctly with trailing bypass" do
+      # Create test records
+      public_record =
+        ResourceWithFixedConditionalCheck
+        |> Ash.Changeset.for_create(:create, %{access_level: :public}, authorize?: false)
+        |> Ash.create!()
+
+      confidential_record =
+        ResourceWithFixedConditionalCheck
+        |> Ash.Changeset.for_create(:create, %{access_level: :confidential}, authorize?: false)
+        |> Ash.create!()
+
+      full_actor = %{level: :full}
+
+      full_results =
+        ResourceWithFixedConditionalCheck
+        |> Ash.read!(actor: full_actor)
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert full_results == Enum.sort([public_record.id, confidential_record.id])
+
+      partial_actor = %{level: :partial}
+
+      partial_results =
+        ResourceWithFixedConditionalCheck
+        |> Ash.read!(actor: partial_actor)
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert partial_results == [public_record.id]
+
+      no_access_actor = %{level: :none}
+
+      no_results = Ash.read!(ResourceWithFixedConditionalCheck, actor: no_access_actor)
+      assert no_results == []
+
+      super_admin_actor = %{super_admin: true, level: :none}
+
+      super_admin_results =
+        ResourceWithFixedConditionalCheck
+        |> Ash.read!(actor: super_admin_actor)
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert super_admin_results == Enum.sort([public_record.id, confidential_record.id])
     end
   end
 end

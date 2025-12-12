@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Actions.Create do
   @moduledoc "Represents a create action on a resource."
   defstruct [
@@ -25,7 +29,8 @@ defmodule Ash.Resource.Actions.Create do
     reject: [],
     metadata: [],
     transaction?: true,
-    type: :create
+    type: :create,
+    __spark_metadata__: nil
   ]
 
   @type t :: %__MODULE__{
@@ -53,7 +58,8 @@ defmodule Ash.Resource.Actions.Create do
           touches_resources: list(atom),
           arguments: list(Ash.Resource.Actions.Argument.t()),
           primary?: boolean,
-          description: String.t() | nil
+          description: String.t() | nil,
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   import Ash.Resource.Actions.SharedOptions

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash do
   @moduledoc """
   The primary interface to call actions and interact with resources.
@@ -2074,7 +2078,14 @@ defmodule Ash do
          {:ok, read_opts} <-
            ReadOpts.validate(Keyword.take(opts, Keyword.keys(@read_opts_schema))),
          read_opts <- ReadOpts.to_options(read_opts),
-         {:ok, result} <- do_get(resource, filter, domain, opts, read_opts) do
+         {:ok, action} <-
+           Ash.Helpers.get_action(
+             resource,
+             opts,
+             :read,
+             Ash.Resource.Info.primary_action(resource, :read)
+           ),
+         {:ok, result} <- do_get(resource, filter, domain, opts, action, read_opts) do
       {:ok, result}
     else
       {:error, error} ->
@@ -2082,7 +2093,7 @@ defmodule Ash do
     end
   end
 
-  defp do_get(resource, filter, domain, opts, read_opts) do
+  defp do_get(resource, filter, domain, opts, action, read_opts) do
     query =
       resource
       |> Ash.Query.new(domain: domain)
@@ -2099,7 +2110,7 @@ defmodule Ash do
       end
 
     query
-    |> Ash.Actions.Read.unpaginated_read(opts[:action] || query.action, read_opts)
+    |> Ash.Actions.Read.unpaginated_read(action, read_opts)
     |> case do
       {:ok, %{results: [single_result]}} ->
         {:ok, single_result}
@@ -2216,10 +2227,7 @@ defmodule Ash do
     {:error, "Cannot seek to a specific page with keyset based pagination"}
   end
 
-  def page(
-        %Ash.Page.Keyset{results: results, rerun: {query, opts}} = page,
-        :next
-      ) do
+  def page(%Ash.Page.Keyset{results: results, rerun: {query, opts}}, :next) do
     last_keyset =
       results
       |> :lists.last()
@@ -2231,19 +2239,13 @@ defmodule Ash do
       |> Keyword.delete(:before)
       |> Keyword.put(:after, last_keyset)
 
-    query =
-      Ash.Query.page(query, new_page_opts)
-
-    case read(query, opts) do
-      {:ok, %{results: []}} ->
-        {:ok, %{page | more?: false}}
-
-      other ->
-        other
+    case Ash.Query.page(query, new_page_opts) |> read(opts) do
+      {:ok, %{results: []} = page} -> {:ok, page}
+      other -> other
     end
   end
 
-  def page(%Ash.Page.Keyset{results: results, rerun: {query, opts}} = page, :prev) do
+  def page(%Ash.Page.Keyset{results: results, rerun: {query, opts}}, :prev) do
     first_keyset =
       results
       |> List.first()
@@ -2255,14 +2257,9 @@ defmodule Ash do
       |> Keyword.put(:before, first_keyset)
       |> Keyword.delete(:after)
 
-    query = Ash.Query.page(query, new_page_opts)
-
-    case read(query, opts) do
-      {:ok, %{results: []}} ->
-        {:ok, page}
-
-      other ->
-        other
+    case Ash.Query.page(query, new_page_opts) |> read(opts) do
+      {:ok, %{results: []} = page} -> {:ok, page}
+      other -> other
     end
   end
 
@@ -2447,6 +2444,19 @@ defmodule Ash do
     Ash.Helpers.expect_options!(opts)
     resource = Ash.Helpers.resource_from_data!(values, query, opts)
     load(values, query, Keyword.put(opts, :resource, resource))
+  end
+
+  def load(%Ash.Query{}, _query, _opts) do
+    raise ArgumentError,
+      message: """
+      Ash.load expects a record or records, not an Ash.Query. You probably want to
+      load it in the query directly instead:
+
+      query
+      |> Ash.Query.for_read(:read, load: :the_field_that_you_want_to_load)
+
+      See: https://hexdocs.pm/ash/Ash.Query.html#load/3
+      """
   end
 
   def load(%struct{results: results} = page, query, opts)
@@ -3814,8 +3824,11 @@ defmodule Ash do
     use Spark.Options.Validator, schema: transaction_opts
   end
 
+  @doc deprecated: " Use Ash.transact/3 instead."
+
   @doc """
   Wraps the execution of the function in a transaction with the resource's data_layer.
+
   Collects notifications during the function's execution and sends them if the transaction was successful.
 
   ## Examples
@@ -3839,6 +3852,7 @@ defmodule Ash do
 
   ## See also
 
+  - `Ash.transact/3` - recommended replacement that always rolls back on error
   - [Actions Guide](/documentation/topics/actions/actions.md) for understanding action concepts
   - [Development Testing Guide](/documentation/topics/development/testing.md) for testing with transactions
 
@@ -3863,7 +3877,116 @@ defmodule Ash do
       with {:ok, opts} <- TransactionOpts.validate(opts),
            opts <- TransactionOpts.to_options(opts),
            {:ok, result} <-
-             Ash.DataLayer.transaction(resource_or_resources, func, opts[:timeout], opts[:reason]) do
+             Ash.DataLayer.transaction(
+               resource_or_resources,
+               func,
+               opts[:timeout],
+               %{type: :custom, metadata: %{}}
+             ) do
+        if opts[:return_notifications?] do
+          notifications = Process.delete(:ash_notifications) || []
+
+          {:ok, result, notifications}
+        else
+          if notify? do
+            notifications = Process.delete(:ash_notifications) || []
+
+            remaining = Ash.Notifier.notify(notifications)
+
+            remaining
+            |> Enum.group_by(&{&1.resource, &1.action})
+            |> Enum.each(fn {{resource, action}, remaining} ->
+              Ash.Actions.Helpers.warn_missed!(resource, action, %{notifications: remaining})
+            end)
+          end
+
+          {:ok, result}
+        end
+      else
+        {:error, error} ->
+          Process.delete(:ash_notifications)
+
+          {:error, Ash.Error.to_ash_error(error)}
+      end
+    rescue
+      error ->
+        Process.delete(:ash_notifications)
+
+        reraise error, __STACKTRACE__
+    after
+      if notify? do
+        Process.delete(:ash_started_transaction?)
+      end
+
+      if old_notifications do
+        notifications = Process.get(:ash_notifications) || []
+
+        Process.put(:ash_notifications, old_notifications ++ notifications)
+      end
+    end
+  end
+
+  @doc """
+  Wraps the execution of the function in a transaction with the resource's data_layer.
+
+  Collects notifications during the function's execution and sends them if the transaction was successful.
+
+  ## Examples
+
+      iex> Ash.transact(MyApp.Post, fn ->
+      ...>   post = Ash.create!(MyApp.Post, %{title: "Hello"})
+      ...>   Ash.update!(post, %{content: "World"})
+      ...> end)
+      {:ok, %MyApp.Post{title: "Hello", content: "World"}}
+
+      # Automatic rollback on error
+
+      iex> Ash.transact(MyApp.Post, fn ->
+      ...>   Ash.create(MyApp.Post, %{title: "Valid Post"})
+      ...>   {:error, :something_went_wrong}
+      ...> end)
+      {:error, :something_went_wrong}
+
+      # Transaction was automatically rolled back, no post was created
+
+      iex> Ash.transact(MyApp.Post, fn ->
+      ...>   Ash.create!(MyApp.Post, %{title: "Test"})
+      ...> end, return_notifications?: true)
+      {:ok, %MyApp.Post{title: "Test"}, [%Ash.Notifier.Notification{}]}
+
+  ## See also
+
+  - [Actions Guide](/documentation/topics/actions/actions.md) for understanding action concepts
+  - [Development Testing Guide](/documentation/topics/development/testing.md) for testing with transactions
+
+  ## Options
+
+  #{Spark.Options.docs(@transaction_opts_schema)}
+  """
+  @spec transact(
+          resource_or_resources :: Ash.Resource.t() | [Ash.Resource.t()],
+          func :: (-> term),
+          opts :: Keyword.t()
+        ) ::
+          {:ok, term}
+          | {:ok, term, list(Ash.Notifier.Notification.t())}
+          | {:error, term}
+  @doc spark_opts: [{2, @transaction_opts_schema}]
+  def transact(resource_or_resources, func, opts \\ []) do
+    notify? = !Process.put(:ash_started_transaction?, true)
+    old_notifications = Process.delete(:ash_notifications)
+
+    try do
+      with {:ok, opts} <- TransactionOpts.validate(opts),
+           opts <- TransactionOpts.to_options(opts),
+           {:ok, result} <-
+             Ash.DataLayer.transaction(
+               resource_or_resources,
+               func,
+               opts[:timeout],
+               %{type: :custom, metadata: %{}},
+               rollback_on_error?: true
+             ) do
         if opts[:return_notifications?] do
           notifications = Process.delete(:ash_notifications) || []
 

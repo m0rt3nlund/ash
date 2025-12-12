@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Validation.Builtins do
   @moduledoc """
   Built in validations that are available to all resources
@@ -17,6 +21,18 @@ defmodule Ash.Resource.Validation.Builtins do
   @spec one_of(attribute :: atom, list(any)) :: Validation.ref()
   def one_of(attribute, values) do
     {Validation.OneOf, attribute: attribute, values: values}
+  end
+
+  @doc """
+  Validates that the original value is in a given list
+
+  ## Examples
+
+      validate data_one_of(:status, [:closed_won, :closed_lost])
+  """
+  @spec data_one_of(attribute :: atom, list(any)) :: Validation.ref()
+  def data_one_of(attribute, values) do
+    {Validation.DataOneOf, attribute: attribute, values: values}
   end
 
   @doc """
@@ -76,6 +92,21 @@ defmodule Ash.Resource.Validation.Builtins do
   @spec negate(validation :: Validation.ref()) :: Validation.ref()
   def negate(validation) do
     {Validation.Negate, validation: validation}
+  end
+
+  @doc """
+  Validates that at least one of the provided validations passes
+
+  ## Examples
+
+      validate any([
+        one_of(:status, [:valid]),
+        match(:title, "^[a-z]+$")
+      ])
+  """
+  @spec any(validations :: list(Validation.ref())) :: Validation.ref()
+  def any(validations) do
+    {Validation.Any, validations: validations}
   end
 
   @doc """

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Reactor.Dsl.Transaction do
   @moduledoc """
   The `transaction` entity for the `Ash.Reactor` reactor extension.
@@ -17,7 +21,8 @@ defmodule Ash.Reactor.Dsl.Transaction do
             steps: [],
             type: :transaction,
             timeout: @default_timeout,
-            wait_for: []
+            wait_for: [],
+            __spark_metadata__: nil
 
   @type t :: %__MODULE__{
           __identifier__: any,
@@ -30,7 +35,8 @@ defmodule Ash.Reactor.Dsl.Transaction do
           steps: [Reactor.Step.t()],
           timeout: timeout(),
           type: :transaction,
-          wait_for: [Reactor.Dsl.WaitFor.t()]
+          wait_for: [Reactor.Dsl.WaitFor.t()],
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   @doc false

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Policy.PolicyGroup do
   @moduledoc "Represents a policy group on an Ash.Resource"
 
@@ -5,7 +9,8 @@ defmodule Ash.Policy.PolicyGroup do
   # on build, when we support nested policies we can change that.
   defstruct [
     :condition,
-    :policies
+    :policies,
+    :__spark_metadata__
   ]
 
   @doc false

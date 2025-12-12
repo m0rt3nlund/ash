@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Actions.Create do
   @moduledoc false
 
@@ -487,6 +491,7 @@ defmodule Ash.Actions.Create do
         transaction?: Keyword.get(opts, :transaction?, true) && changeset.action.transaction?,
         rollback_on_error?: opts[:rollback_on_error?],
         tracer: opts[:tracer],
+        notification_metadata: opts[:notification_metadata],
         return_notifications?: opts[:return_notifications?],
         transaction_metadata: %{
           type: :create,

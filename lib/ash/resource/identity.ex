@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Identity do
   @moduledoc """
   Represents a unique constraint on a resource
@@ -21,7 +25,8 @@ defmodule Ash.Resource.Identity do
     :pre_check?,
     :pre_check_with,
     :all_tenants?,
-    nils_distinct?: false
+    nils_distinct?: false,
+    __spark_metadata__: nil
   ]
 
   @schema [
@@ -96,6 +101,7 @@ defmodule Ash.Resource.Identity do
           description: String.t() | nil,
           where: nil | Ash.Expr.t(),
           nils_distinct?: boolean(),
-          all_tenants?: boolean()
+          all_tenants?: boolean(),
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 end

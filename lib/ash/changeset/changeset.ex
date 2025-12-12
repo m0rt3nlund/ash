@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Changeset do
   @moduledoc """
   Changesets are used to create and update data in Ash.
@@ -37,6 +41,20 @@ defmodule Ash.Changeset do
   end
   ```
   """
+  defp clear_metadata(%{__metadata__: metadata} = record) when is_map(metadata) do
+    %{
+      record
+      | __metadata__:
+          Map.drop(metadata, [
+            :upsert_skipped,
+            :manual_key,
+            :private,
+            :__reactor__
+          ])
+    }
+  end
+
+  defp clear_metadata(record), do: record
 
   defstruct [
     :__validated_for_action__,
@@ -86,19 +104,7 @@ defmodule Ash.Changeset do
   defimpl Inspect do
     import Inspect.Algebra
 
-    @spec inspect(Ash.Changeset.t(), Inspect.Opts.t()) ::
-            {:doc_cons, :doc_line | :doc_nil | binary | tuple,
-             :doc_line | :doc_nil | binary | tuple}
-            | {:doc_group,
-               :doc_line
-               | :doc_nil
-               | binary
-               | {:doc_collapse, pos_integer}
-               | {:doc_force, any}
-               | {:doc_break | :doc_color | :doc_cons | :doc_fits | :doc_group | :doc_string, any,
-                  any}
-               | {:doc_nest, any, :cursor | :reset | non_neg_integer, :always | :break},
-               :inherit | :self}
+    @spec inspect(Ash.Changeset.t(), Inspect.Opts.t()) :: Inspect.Algebra.t()
     def inspect(changeset, opts) do
       context = Map.delete(changeset.context, :private)
 
@@ -508,19 +514,20 @@ defmodule Ash.Changeset do
     context = Ash.Resource.Info.default_context(resource) || %{}
 
     if Ash.Resource.Info.resource?(resource) do
-      %__MODULE__{resource: resource, data: record, action_type: action_type}
+      new_changeset(resource, record, action_type)
       |> set_context(context)
       |> set_tenant(tenant)
     else
-      %__MODULE__{
-        resource: resource,
-        action_type: action_type,
-        data: struct(resource)
-      }
+      new_changeset(resource, struct(resource), action_type)
       |> add_error(NoSuchResource.exception(resource: resource))
       |> set_tenant(tenant)
       |> set_context(context)
     end
+  end
+
+  @spec new_changeset(Ash.Resource.t(), term(), atom()) :: t()
+  defp new_changeset(resource, data, action_type) do
+    %__MODULE__{resource: resource, data: data, action_type: action_type}
   end
 
   @doc """
@@ -1487,7 +1494,11 @@ defmodule Ash.Changeset do
             Ash.Expr.expr(type(^new_value, ^attribute.type, ^attribute.constraints))
 
           :error ->
-            expr(^ref(field))
+            if changeset.action.type == :create and changeset.context[:private][:upsert?] do
+              expr(upsert_conflict(^field))
+            else
+              expr(^ref(field))
+            end
         end
     end
   end
@@ -1663,7 +1674,15 @@ defmodule Ash.Changeset do
     Ash.Filter.map(expr, fn
       %Ash.Query.Function.Error{arguments: [module, nested_expr]} = func
       when is_map(nested_expr) and not is_struct(nested_expr) ->
-        %{func | arguments: [module, Map.put(nested_expr, :field, field)]}
+        if Map.has_key?(nested_expr, :field) || Map.has_key?(nested_expr, :fields) do
+          func
+        else
+          if Map.has_key?(module.__struct__(), :fields) do
+            %{func | arguments: [module, Map.put(nested_expr, :fields, [field])]}
+          else
+            %{func | arguments: [module, Map.put(nested_expr, :field, field)]}
+          end
+        end
 
       other ->
         other
@@ -1958,7 +1977,9 @@ defmodule Ash.Changeset do
           changeset
 
         %mod{} = struct when mod != __MODULE__ ->
-          new(struct)
+          struct
+          |> clear_metadata()
+          |> new()
 
         other ->
           raise ArgumentError,
@@ -2040,6 +2061,7 @@ defmodule Ash.Changeset do
 
         %_{} = struct ->
           struct
+          |> clear_metadata()
           |> new()
           |> Map.put(:action_type, :destroy)
 
@@ -2239,7 +2261,9 @@ defmodule Ash.Changeset do
   - `change_attribute/3` for regular (non-atomic) attribute changes
   """
   @spec atomic_update(t(), atom(), {:atomic, Ash.Expr.t()} | Ash.Expr.t()) :: t()
-  def atomic_update(changeset, key, {:atomic, value}) do
+  def atomic_update(changeset, key, value, opts \\ [])
+
+  def atomic_update(changeset, key, {:atomic, value}, _opts) do
     %{
       changeset
       | atomics: Keyword.put(changeset.atomics, key, value),
@@ -2247,15 +2271,15 @@ defmodule Ash.Changeset do
     }
   end
 
-  def atomic_update(changeset, key, value) do
-    do_atomic_update(changeset, key, value)
+  def atomic_update(changeset, key, value, opts) do
+    do_atomic_update(changeset, key, value, opts)
   end
 
   defp try_atomic_update(changeset, key, value) do
-    do_atomic_update(changeset, key, value, true)
+    do_atomic_update(changeset, key, value, return_not_atomic?: true)
   end
 
-  defp do_atomic_update(changeset, key, value, return_not_atomic? \\ false) do
+  defp do_atomic_update(changeset, key, value, opts) do
     attribute =
       Ash.Resource.Info.attribute(changeset.resource, key) ||
         raise "Unknown attribute `#{inspect(changeset.resource)}.#{inspect(key)}`"
@@ -2304,16 +2328,21 @@ defmodule Ash.Changeset do
         add_invalid_errors(value, :attribute, changeset, attribute, error)
 
       {:not_atomic, message} ->
-        if return_not_atomic? do
-          {:not_atomic, message}
-        else
-          add_error(
-            changeset,
-            Ash.Error.Unknown.UnknownError.exception(
-              error:
-                "Cannot atomically update #{inspect(changeset.resource)}.#{attribute.name}: #{message}"
+        cond do
+          opts[:fallback_to_no_cast?] ->
+            atomic_update(changeset, key, {:atomic, value})
+
+          Keyword.get(opts, :return_not_atomic?, false) ->
+            {:not_atomic, message}
+
+          true ->
+            add_error(
+              changeset,
+              Ash.Error.Unknown.UnknownError.exception(
+                error:
+                  "Cannot atomically update #{inspect(changeset.resource)}.#{attribute.name}: #{message}"
+              )
             )
-          )
         end
     end
   end
@@ -2335,7 +2364,7 @@ defmodule Ash.Changeset do
         else
           if Ash.DataLayer.data_layer_can?(changeset.resource, :expr_error) do
             expr(
-              if is_nil(^value) do
+              if is_nil(type(^value, ^attribute.type, ^attribute.constraints)) do
                 error(
                   ^Ash.Error.Changes.Required,
                   %{
@@ -2363,17 +2392,21 @@ defmodule Ash.Changeset do
       end
     end)
     |> Ash.Changeset.hydrate_atomic_refs(actor, eager?: true)
-    |> then(fn changeset ->
-      if changeset.action.type == :update do
-        attributes =
-          changeset.attributes
-          |> Map.keys()
-          |> Enum.reject(&Ash.Resource.Info.attribute(changeset.resource, &1).allow_nil?)
+    |> then(fn
+      {:not_atomic, value} ->
+        {:not_atomic, value}
 
-        require_values(changeset, :update, false, attributes)
-      else
-        changeset
-      end
+      %Ash.Changeset{} = changeset ->
+        if changeset.action.type == :update do
+          attributes =
+            changeset.attributes
+            |> Map.keys()
+            |> Enum.reject(&Ash.Resource.Info.attribute(changeset.resource, &1).allow_nil?)
+
+          require_values(changeset, :update, false, attributes)
+        else
+          changeset
+        end
     end)
   end
 
@@ -2712,10 +2745,10 @@ defmodule Ash.Changeset do
   end
 
   defp handle_upsert(changeset) do
-    if changeset.context.private[:upsert_condition] do
-      filter(changeset, changeset.context.private.upsert_condition)
-    else
+    if is_nil(changeset.context.private[:upsert_condition]) do
       changeset
+    else
+      filter(changeset, changeset.context.private.upsert_condition)
     end
   end
 
@@ -3527,14 +3560,14 @@ defmodule Ash.Changeset do
 
               :error ->
                 if changeset.action.type == :update || Map.get(changeset.action, :soft?) do
-                  [first_pkey_field | _] = Ash.Resource.Info.primary_key(changeset.resource)
+                  validation_attribute = validation_attribute(changeset)
 
                   full_atomic_update =
                     expr(
                       if ^condition_expr do
                         ^error_expr
                       else
-                        ^atomic_ref(changeset, first_pkey_field)
+                        ^atomic_ref(changeset, validation_attribute)
                       end
                     )
 
@@ -3546,8 +3579,9 @@ defmodule Ash.Changeset do
                       {:cont,
                        atomic_update(
                          changeset,
-                         first_pkey_field,
-                         full_atomic_update
+                         validation_attribute,
+                         full_atomic_update,
+                         fallback_to_no_cast?: true
                        )}
 
                     {:error, error} ->
@@ -3733,6 +3767,23 @@ defmodule Ash.Changeset do
 
   defp default(:update, %{update_default: value}), do: value
 
+  defp validation_attribute(changeset) do
+    case List.last(changeset.atomics) do
+      {attr, _} ->
+        attr
+
+      _ ->
+        case Ash.Resource.Info.atomic_validation_default_target_attribute(changeset.resource) do
+          nil ->
+            [first_pkey_field | _] = Ash.Resource.Info.primary_key(changeset.resource)
+            first_pkey_field
+
+          attribute_name ->
+            attribute_name
+        end
+    end
+  end
+
   defp add_validations(changeset, tracer, metadata, actor) do
     if changeset.action.skip_global_validations? do
       changeset
@@ -3858,54 +3909,56 @@ defmodule Ash.Changeset do
               changeset: changeset
             )
 
-          with {:ok, opts} <- validation.module.init(opts),
-               :ok <-
-                 Ash.Resource.Validation.validate(
-                   validation.module,
-                   changeset,
-                   opts,
-                   struct(
-                     Ash.Resource.Validation.Context,
-                     Map.put(context, :message, validation.message)
-                   )
-                 ) do
-            changeset
-          else
-            :ok ->
-              changeset
-
-            {:error, error} when is_binary(error) ->
-              Ash.Changeset.add_error(changeset, validation.message || error)
-
-            {:error, error} when is_exception(error) ->
-              if validation.message do
-                error = Ash.Error.override_validation_message(error, validation.message)
-                add_error(changeset, error)
-              else
-                add_error(changeset, error)
-              end
-
-            {:error, errors} when is_list(errors) ->
-              if validation.message do
-                errors =
-                  Enum.map(errors, fn error ->
-                    Ash.Error.override_validation_message(error, validation.message)
-                  end)
-
-                add_error(changeset, errors)
-              else
-                add_error(changeset, errors)
-              end
-
+          case validation.module.init(opts) do
             {:error, error} ->
-              error =
-                if Keyword.keyword?(error) do
-                  Keyword.put(error, :message, validation.message || error[:message])
-                else
-                  validation.message || error
-                end
-
               Ash.Changeset.add_error(changeset, error)
+
+            {:ok, opts} ->
+              case Ash.Resource.Validation.validate(
+                     validation.module,
+                     changeset,
+                     opts,
+                     struct(
+                       Ash.Resource.Validation.Context,
+                       Map.put(context, :message, validation.message)
+                     )
+                   ) do
+                :ok ->
+                  changeset
+
+                {:error, error} when is_binary(error) ->
+                  Ash.Changeset.add_error(changeset, validation.message || error)
+
+                {:error, error} when is_exception(error) ->
+                  if validation.message do
+                    error = Ash.Error.override_validation_message(error, validation.message)
+                    add_error(changeset, error)
+                  else
+                    add_error(changeset, error)
+                  end
+
+                {:error, errors} when is_list(errors) ->
+                  if validation.message do
+                    errors =
+                      Enum.map(errors, fn error ->
+                        Ash.Error.override_validation_message(error, validation.message)
+                      end)
+
+                    add_error(changeset, errors)
+                  else
+                    add_error(changeset, errors)
+                  end
+
+                {:error, error} ->
+                  error =
+                    if Keyword.keyword?(error) do
+                      Keyword.put(error, :message, validation.message || error[:message])
+                    else
+                      validation.message || error
+                    end
+
+                  Ash.Changeset.add_error(changeset, error)
+              end
           end
         end
       end
@@ -4195,7 +4248,8 @@ defmodule Ash.Changeset do
               opts[:transaction_metadata],
               :data_layer_context,
               changeset.context[:data_layer] || %{}
-            )
+            ),
+            rollback_on_error?: false
           )
           |> case do
             {:ok, {:ok, value, changeset, instructions}} ->
@@ -6050,22 +6104,17 @@ defmodule Ash.Changeset do
                Ash.Type.include_source(argument.type, changeset, argument.constraints),
              {:ok, casted} <-
                Ash.Type.cast_input(argument.type, value, constraints),
-             {:constrained, {:ok, casted}, _last_val} when not is_nil(casted) <-
-               {:constrained, Ash.Type.apply_constraints(argument.type, casted, constraints),
-                casted} do
+             {{:ok, casted}, _last_val} <-
+               {Ash.Type.apply_constraints(argument.type, casted, constraints), casted} do
           %{changeset | arguments: Map.put(changeset.arguments, argument.name, casted)}
           |> store_casted_argument(argument.name, casted, store_casted?)
         else
-          {:constrained, {:ok, nil}, _} ->
-            %{changeset | arguments: Map.put(changeset.arguments, argument.name, nil)}
-            |> store_casted_argument(argument.name, nil, store_casted?)
-
-          {:constrained, {:error, error}, last_val} ->
-            add_invalid_errors(value, :argument, changeset, argument, error)
-            |> store_casted_argument(argument.name, last_val, store_casted?)
-
           {:error, error} ->
             add_invalid_errors(value, :argument, changeset, argument, error)
+
+          {{:error, error}, last_val} ->
+            add_invalid_errors(value, :argument, changeset, argument, error)
+            |> store_casted_argument(argument.name, last_val, store_casted?)
         end
       else
         %{changeset | arguments: Map.put(changeset.arguments, argument, value)}

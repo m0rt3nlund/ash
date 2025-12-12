@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Actions.AggregateTest do
   @moduledoc false
   use ExUnit.Case, async: true
@@ -48,6 +52,12 @@ defmodule Ash.Test.Actions.AggregateTest do
       end
 
       create_timestamp :created_at
+    end
+
+    calculations do
+      calculate :doubled_thing3, :integer, expr(thing3 * 2) do
+        public?(true)
+      end
     end
 
     relationships do
@@ -171,6 +181,11 @@ defmodule Ash.Test.Actions.AggregateTest do
       end
 
       avg :average_of_thing3, :comments, :thing3 do
+        public? true
+        authorize? false
+      end
+
+      sum :sum_of_doubled_thing3, :comments, :doubled_thing3 do
         public? true
         authorize? false
       end
@@ -502,6 +517,23 @@ defmodule Ash.Test.Actions.AggregateTest do
       assert_raise Ash.Error.Unknown, ~r/Should raise!/, fn ->
         Ash.load!(post, :count_of_comments_modify_query, authorize?: false)
       end
+    end
+
+    test "aggregates can reference calculations" do
+      post = Post |> Ash.create!(%{public: true}, authorize?: false)
+
+      Comment
+      |> Ash.create!(%{post_id: post.id, public: true, thing3: 5}, authorize?: false)
+
+      Comment
+      |> Ash.create!(%{post_id: post.id, public: true, thing3: 10}, authorize?: false)
+
+      Comment
+      |> Ash.create!(%{post_id: post.id, public: true, thing3: 3}, authorize?: false)
+
+      post = Ash.load!(post, :sum_of_doubled_thing3, authorize?: false)
+
+      assert post.sum_of_doubled_thing3 == 36
     end
   end
 end

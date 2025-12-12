@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Generator do
   @moduledoc """
   Tools for generating input to Ash resource actions and for generating seed data.
@@ -853,7 +857,10 @@ defmodule Ash.Generator do
             "Invalid action #{inspect(resource)}.#{action_name}"
     end
 
-    arguments = Enum.reject(action.arguments, &find_manage_change(&1, action))
+    arguments =
+      Enum.filter(action.arguments, fn argument ->
+        argument.public? && !find_manage_change(argument, action)
+      end)
 
     resource
     |> Ash.Resource.Info.attributes()

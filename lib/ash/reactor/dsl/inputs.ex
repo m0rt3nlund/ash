@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Reactor.Dsl.Inputs do
   @moduledoc """
   The `inputs` entity for the `Ash.Reactor` reactor extension.
@@ -5,14 +9,16 @@ defmodule Ash.Reactor.Dsl.Inputs do
 
   defstruct __identifier__: nil,
             template: %{},
-            transform: nil
+            transform: nil,
+            __spark_metadata__: nil
 
   @type t :: %__MODULE__{
           __identifier__: any,
           template:
             %{optional(atom) => Reactor.Template.t()}
             | Keyword.t(Reactor.Template.t()),
-          transform: nil | (any -> any) | {module, keyword} | mfa
+          transform: nil | (any -> any) | {module, keyword} | mfa,
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   @doc false

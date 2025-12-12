@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.DataLayer.Ets do
   @behaviour Ash.DataLayer
   require Ash.Query
@@ -1445,9 +1449,16 @@ defmodule Ash.DataLayer.Ets do
     else
       key_filters =
         Enum.map(keys, fn key ->
+          value =
+            Ash.Changeset.get_attribute(changeset, key) || Map.get(changeset.params, key) ||
+              Map.get(changeset.params, to_string(key))
+
           {key,
-           Ash.Changeset.get_attribute(changeset, key) || Map.get(changeset.params, key) ||
-             Map.get(changeset.params, to_string(key))}
+           if is_nil(value) do
+             [is_nil: true]
+           else
+             value
+           end}
         end)
 
       query =
@@ -1562,16 +1573,9 @@ defmodule Ash.DataLayer.Ets do
             if Ash.Resource.get_metadata(result, :upsert_skipped) do
               {:cont, {:ok, results}}
             else
-              {:cont,
-               {:ok,
-                [
-                  Ash.Resource.put_metadata(
-                    result,
-                    :bulk_create_index,
-                    changeset.context.bulk_create.index
-                  )
-                  | results
-                ]}}
+              result = Ash.Actions.Helpers.put_bulk_metadata(result, changeset)
+
+              {:cont, {:ok, [result | results]}}
             end
 
           {:error, error} ->
@@ -1588,7 +1592,13 @@ defmodule Ash.DataLayer.Ets do
           with {:ok, pkey} <- get_valid_pkey(resource, changeset),
                {:ok, record} <- Ash.Changeset.apply_attributes(changeset),
                record <- unload_relationships(resource, record) do
-            {:cont, {:ok, [{pkey, changeset.context.bulk_create.index, record} | results]}}
+            {:cont,
+             {:ok,
+              [
+                {pkey, changeset.context.bulk_create.index, changeset.context.bulk_create.ref,
+                 record}
+                | results
+              ]}}
           else
             {:error, error} ->
               {:halt, {:error, error}}
@@ -1659,10 +1669,11 @@ defmodule Ash.DataLayer.Ets do
   defp put_or_insert_new_batch(table, records, resource, return_records?) do
     attributes = resource |> Ash.Resource.Info.attributes()
 
-    Enum.reduce_while(records, {:ok, [], []}, fn {pkey, index, record}, {:ok, acc, indices} ->
+    Enum.reduce_while(records, {:ok, [], []}, fn {pkey, index, ref, record},
+                                                 {:ok, acc, indices} ->
       case dump_to_native(record, attributes) do
         {:ok, casted} ->
-          {:cont, {:ok, [{pkey, casted} | acc], [{pkey, index} | indices]}}
+          {:cont, {:ok, [{pkey, casted} | acc], [{pkey, index, ref} | indices]}}
 
         {:error, error} ->
           {:halt, {:error, error}}
@@ -1673,13 +1684,20 @@ defmodule Ash.DataLayer.Ets do
         case ETS.Set.put(table, batch) do
           {:ok, set} ->
             if return_records? do
-              Enum.reduce_while(indices, {:ok, []}, fn {pkey, index}, {:ok, acc} ->
+              Enum.reduce_while(indices, {:ok, []}, fn {pkey, index, ref}, {:ok, acc} ->
                 {_key, record} = ETS.Set.get!(set, pkey)
 
                 case cast_record(record, resource) do
                   {:ok, casted} ->
-                    {:cont,
-                     {:ok, [Ash.Resource.put_metadata(casted, :bulk_create_index, index) | acc]}}
+                    casted =
+                      Ash.Actions.Helpers.put_bulk_metadata(
+                        casted,
+                        index,
+                        ref,
+                        :bulk_create_index
+                      )
+
+                    {:cont, {:ok, [casted | acc]}}
 
                   {:error, error} ->
                     {:halt, {:error, error}}
@@ -1760,13 +1778,17 @@ defmodule Ash.DataLayer.Ets do
       {:ok, results} ->
         results
         |> Enum.reduce_while(acc, fn result, acc ->
-          case destroy(query.resource, %{changeset | data: result}) do
+          result_changeset = %{changeset | data: result}
+
+          case destroy(query.resource, result_changeset) do
             :ok ->
               case acc do
                 :ok ->
                   {:cont, :ok}
 
                 {:ok, results} ->
+                  result = Ash.Actions.Helpers.put_bulk_metadata(result, result_changeset)
+
                   {:cont, {:ok, [result | results]}}
               end
 
@@ -1863,8 +1885,12 @@ defmodule Ash.DataLayer.Ets do
     |> case do
       {:ok, results} ->
         Enum.reduce_while(results, acc, fn result, acc ->
-          case update(query.resource, %{changeset | data: result}, nil, true) do
+          result_changeset = %{changeset | data: result}
+
+          case update(query.resource, result_changeset, nil, true) do
             {:ok, result} ->
+              result = Ash.Actions.Helpers.put_bulk_metadata(result, result_changeset)
+
               case acc do
                 :ok ->
                   {:cont, :ok}

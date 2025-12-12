@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Reactor.Dsl.BulkUpdate do
   @moduledoc """
   The `bulk_update` entity for the `Ash.Reactor` reactor extension.
@@ -58,7 +62,8 @@ defmodule Ash.Reactor.Dsl.BulkUpdate do
             type: :bulk_update,
             undo_action: nil,
             undo: :never,
-            wait_for: []
+            wait_for: [],
+            __spark_metadata__: nil
 
   @type t :: %__MODULE__{
           __identifier__: any,
@@ -110,7 +115,8 @@ defmodule Ash.Reactor.Dsl.BulkUpdate do
           transaction: :all | :batch | false,
           type: :bulk_create,
           undo_action: nil,
-          undo: :never
+          undo: :never,
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   @doc false
@@ -229,7 +235,7 @@ defmodule Ash.Reactor.Dsl.BulkUpdate do
             default: 0
           ],
           notification_metadata: [
-            type: {:or, [:map, Reactor.Template.type()]},
+            type: {:or, [Reactor.Template.type(), :map]},
             doc:
               "Metadata to be merged into the metadata field for all notifications sent from this operation.",
             required: false,

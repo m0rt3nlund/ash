@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Relationships.HasMany do
   @moduledoc "Represents a has_many relationship on a resource"
   defstruct [
@@ -29,7 +33,8 @@ defmodule Ash.Resource.Relationships.HasMany do
     could_be_related_at_creation?: false,
     validate_destination_attribute?: true,
     cardinality: :many,
-    type: :has_many
+    type: :has_many,
+    __spark_metadata__: nil
   ]
 
   @type t :: %__MODULE__{
@@ -54,7 +59,8 @@ defmodule Ash.Resource.Relationships.HasMany do
           sort: Keyword.t() | nil,
           default_sort: Keyword.t() | nil,
           description: String.t(),
-          manual: atom | {atom, Keyword.t()} | nil
+          manual: atom | {atom, Keyword.t()} | nil,
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   import Ash.Resource.Relationships.SharedOptions

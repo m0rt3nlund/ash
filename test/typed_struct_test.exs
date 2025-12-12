@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.TypedStructTest do
   use ExUnit.Case, async: true
 
@@ -60,6 +64,23 @@ defmodule Ash.TypedStructTest do
       field(:nested_list, {:array, {:array, :string}}, default: [[]])
       field(:list_of_maps, {:array, :map}, default: [%{}])
       field(:map_with_defaults, :map, default: %{nested: %{key: "value"}})
+    end
+  end
+
+  defmodule Reward do
+    use Ash.TypedStruct
+
+    typed_struct do
+      field(:name, :string)
+    end
+  end
+
+  defmodule Balance do
+    use Ash.TypedStruct
+
+    typed_struct do
+      field(:points_balance, :float)
+      field(:rewards, {:array, Reward}, default: [])
     end
   end
 
@@ -284,6 +305,22 @@ defmodule Ash.TypedStructTest do
       assert struct.nested_list == [["a", "b"], ["c"]]
       assert struct.list_of_maps == [%{a: 1}, %{b: 2}]
       assert struct.map_with_defaults == %{custom: "map"}
+    end
+
+    test "struct DSL handles array of TypedStructs with default value" do
+      data = %{
+        "points_balance" => 150.0,
+        "rewards" => [
+          %{"name" => "Free Coffee"},
+          %{"name" => "10% Discount"}
+        ]
+      }
+
+      assert {:ok, balance} = Balance.new(data)
+      assert balance.points_balance == 150.0
+      assert length(balance.rewards) == 2
+      assert %Reward{name: "Free Coffee"} = Enum.at(balance.rewards, 0)
+      assert %Reward{name: "10% Discount"} = Enum.at(balance.rewards, 1)
     end
   end
 

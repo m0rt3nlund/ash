@@ -407,7 +407,11 @@ has_one name, destination
 
 Declares a `has_one` relationship. In a relational database, the foreign key would be on the *other* table.
 
-Generally speaking, a `has_one` also implies that the destination table is unique on that foreign key.
+Generally speaking, a `has_one` also implies that the destination table is
+unique on that foreign key. To add a uniqueness constraint, you will need
+to add an identity for the foreign key column on the resource which defines
+the `belongs_to` side of the relationship. See the 
+[identities guide](/documentation/topics/resources/identities.md) to learn more.
 
 See the [relationships guide](/documentation/topics/resources/relationships.md) for more.
 
@@ -2480,6 +2484,7 @@ end
 | [`hide_inspect_fields`](#resource-hide_inspect_fields){: #resource-hide_inspect_fields } | `list(atom)` | `[]` | A deny-list of fields to hide from the inspect output. Takes precedence over `show_inspect_fields`. |
 | [`show_inspect_fields`](#resource-show_inspect_fields){: #resource-show_inspect_fields } | `list(atom)` |  | An allow-list of fields to show in the inspect output. Sensitive fields are _always_ hidden. |
 | [`plural_name`](#resource-plural_name){: #resource-plural_name } | `atom` |  | A pluralized version of the resource short_name. May be used by generators or automated tooling. |
+| [`atomic_validation_default_target_attribute`](#resource-atomic_validation_default_target_attribute){: #resource-atomic_validation_default_target_attribute } | `atom` |  | Overrides the attribute used when building atomic validation filters. Defaults to the first primary key attribute when not specified. |
 | [`require_primary_key?`](#resource-require_primary_key?){: #resource-require_primary_key? } | `boolean` | `true` | Allow the resource to be used without any primary key fields. Warning: this option is experimental, and should not be used unless you know what you're doing. |
 
 
@@ -2870,6 +2875,7 @@ end
 | [`sortable?`](#aggregates-count-sortable?){: #aggregates-count-sortable? } | `boolean` | `true` | Whether or not the aggregate should be usable in sorts. |
 | [`sensitive?`](#aggregates-count-sensitive?){: #aggregates-count-sensitive? } | `boolean` | `false` | Whether or not the aggregate should be considered sensitive. |
 | [`authorize?`](#aggregates-count-authorize?){: #aggregates-count-authorize? } | `boolean` | `true` | Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action. |
+| [`multitenancy`](#aggregates-count-multitenancy){: #aggregates-count-multitenancy } | `:bypass` |  | Configures multitenancy behavior for the aggregate. * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set. |
 
 
 ### aggregates.count.join_filter
@@ -2958,6 +2964,7 @@ exists :has_ticket, :assigned_tickets
 | [`sortable?`](#aggregates-exists-sortable?){: #aggregates-exists-sortable? } | `boolean` | `true` | Whether or not the aggregate should be usable in sorts. |
 | [`sensitive?`](#aggregates-exists-sensitive?){: #aggregates-exists-sensitive? } | `boolean` | `false` | Whether or not the aggregate should be considered sensitive. |
 | [`authorize?`](#aggregates-exists-authorize?){: #aggregates-exists-authorize? } | `boolean` | `true` | Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action. |
+| [`multitenancy`](#aggregates-exists-multitenancy){: #aggregates-exists-multitenancy } | `:bypass` |  | Configures multitenancy behavior for the aggregate. * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set. |
 
 
 ### aggregates.exists.join_filter
@@ -3053,6 +3060,7 @@ end
 | [`sortable?`](#aggregates-first-sortable?){: #aggregates-first-sortable? } | `boolean` | `true` | Whether or not the aggregate should be usable in sorts. |
 | [`sensitive?`](#aggregates-first-sensitive?){: #aggregates-first-sensitive? } | `boolean` | `false` | Whether or not the aggregate should be considered sensitive. |
 | [`authorize?`](#aggregates-first-authorize?){: #aggregates-first-authorize? } | `boolean` | `true` | Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action. |
+| [`multitenancy`](#aggregates-first-multitenancy){: #aggregates-first-multitenancy } | `:bypass` |  | Configures multitenancy behavior for the aggregate. * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set. |
 
 
 ### aggregates.first.join_filter
@@ -3144,6 +3152,7 @@ end
 | [`sortable?`](#aggregates-sum-sortable?){: #aggregates-sum-sortable? } | `boolean` | `true` | Whether or not the aggregate should be usable in sorts. |
 | [`sensitive?`](#aggregates-sum-sensitive?){: #aggregates-sum-sensitive? } | `boolean` | `false` | Whether or not the aggregate should be considered sensitive. |
 | [`authorize?`](#aggregates-sum-authorize?){: #aggregates-sum-authorize? } | `boolean` | `true` | Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action. |
+| [`multitenancy`](#aggregates-sum-multitenancy){: #aggregates-sum-multitenancy } | `:bypass` |  | Configures multitenancy behavior for the aggregate. * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set. |
 
 
 ### aggregates.sum.join_filter
@@ -3239,6 +3248,7 @@ end
 | [`sortable?`](#aggregates-list-sortable?){: #aggregates-list-sortable? } | `boolean` | `true` | Whether or not the aggregate should be usable in sorts. |
 | [`sensitive?`](#aggregates-list-sensitive?){: #aggregates-list-sensitive? } | `boolean` | `false` | Whether or not the aggregate should be considered sensitive. |
 | [`authorize?`](#aggregates-list-authorize?){: #aggregates-list-authorize? } | `boolean` | `true` | Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action. |
+| [`multitenancy`](#aggregates-list-multitenancy){: #aggregates-list-multitenancy } | `:bypass` |  | Configures multitenancy behavior for the aggregate. * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set. |
 
 
 ### aggregates.list.join_filter
@@ -3330,6 +3340,7 @@ end
 | [`sortable?`](#aggregates-max-sortable?){: #aggregates-max-sortable? } | `boolean` | `true` | Whether or not the aggregate should be usable in sorts. |
 | [`sensitive?`](#aggregates-max-sensitive?){: #aggregates-max-sensitive? } | `boolean` | `false` | Whether or not the aggregate should be considered sensitive. |
 | [`authorize?`](#aggregates-max-authorize?){: #aggregates-max-authorize? } | `boolean` | `true` | Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action. |
+| [`multitenancy`](#aggregates-max-multitenancy){: #aggregates-max-multitenancy } | `:bypass` |  | Configures multitenancy behavior for the aggregate. * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set. |
 
 
 ### aggregates.max.join_filter
@@ -3421,6 +3432,7 @@ end
 | [`sortable?`](#aggregates-min-sortable?){: #aggregates-min-sortable? } | `boolean` | `true` | Whether or not the aggregate should be usable in sorts. |
 | [`sensitive?`](#aggregates-min-sensitive?){: #aggregates-min-sensitive? } | `boolean` | `false` | Whether or not the aggregate should be considered sensitive. |
 | [`authorize?`](#aggregates-min-authorize?){: #aggregates-min-authorize? } | `boolean` | `true` | Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action. |
+| [`multitenancy`](#aggregates-min-multitenancy){: #aggregates-min-multitenancy } | `:bypass` |  | Configures multitenancy behavior for the aggregate. * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set. |
 
 
 ### aggregates.min.join_filter
@@ -3512,6 +3524,7 @@ end
 | [`sortable?`](#aggregates-avg-sortable?){: #aggregates-avg-sortable? } | `boolean` | `true` | Whether or not the aggregate should be usable in sorts. |
 | [`sensitive?`](#aggregates-avg-sensitive?){: #aggregates-avg-sensitive? } | `boolean` | `false` | Whether or not the aggregate should be considered sensitive. |
 | [`authorize?`](#aggregates-avg-authorize?){: #aggregates-avg-authorize? } | `boolean` | `true` | Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action. |
+| [`multitenancy`](#aggregates-avg-multitenancy){: #aggregates-avg-multitenancy } | `:bypass` |  | Configures multitenancy behavior for the aggregate. * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set. |
 
 
 ### aggregates.avg.join_filter
@@ -3608,6 +3621,7 @@ end
 | [`sortable?`](#aggregates-custom-sortable?){: #aggregates-custom-sortable? } | `boolean` | `true` | Whether or not the aggregate should be usable in sorts. |
 | [`sensitive?`](#aggregates-custom-sensitive?){: #aggregates-custom-sensitive? } | `boolean` | `false` | Whether or not the aggregate should be considered sensitive. |
 | [`authorize?`](#aggregates-custom-authorize?){: #aggregates-custom-authorize? } | `boolean` | `true` | Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action. |
+| [`multitenancy`](#aggregates-custom-multitenancy){: #aggregates-custom-multitenancy } | `:bypass` |  | Configures multitenancy behavior for the aggregate. * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set. |
 
 
 ### aggregates.custom.join_filter
@@ -3747,7 +3761,7 @@ end
 | [`description`](#calculations-calculate-description){: #calculations-calculate-description } | `String.t` |  | An optional description for the calculation |
 | [`public?`](#calculations-calculate-public?){: #calculations-calculate-public? } | `boolean` | `false` | Whether or not the calculation will appear in public interfaces. |
 | [`sensitive?`](#calculations-calculate-sensitive?){: #calculations-calculate-sensitive? } | `boolean` | `false` | Whether or not references to the calculation will be considered sensitive. |
-| [`load`](#calculations-calculate-load){: #calculations-calculate-load } | `any` | `[]` | A load statement to be applied if the calculation is used. |
+| [`load`](#calculations-calculate-load){: #calculations-calculate-load } | `any` | `[]` | A load statement to be applied if the calculation is used. Only works with module-based or function-based calculations, not expression calculations. |
 | [`allow_nil?`](#calculations-calculate-allow_nil?){: #calculations-calculate-allow_nil? } | `boolean` | `true` | Whether or not the calculation can return nil. |
 | [`filterable?`](#calculations-calculate-filterable?){: #calculations-calculate-filterable? } | `boolean \| :simple_equality` | `true` | Whether or not the calculation should be usable in filters. |
 | [`sortable?`](#calculations-calculate-sortable?){: #calculations-calculate-sortable? } | `boolean` | `true` | Whether or not the calculation can be referenced in sorts. |
@@ -3848,6 +3862,7 @@ end
 | [`attribute`](#multitenancy-attribute){: #multitenancy-attribute } | `atom` |  | If using the `attribute` strategy, the attribute to use, e.g `org_id` |
 | [`global?`](#multitenancy-global?){: #multitenancy-global? } | `boolean` | `false` | Whether or not the data may be accessed without setting a tenant. For example, with attribute multitenancy, this allows accessing without filtering by the tenant attribute. |
 | [`parse_attribute`](#multitenancy-parse_attribute){: #multitenancy-parse_attribute } | `mfa` | `{Ash.Resource.Dsl, :identity, []}` | An mfa ({module, function, args}) pointing to a function that takes a tenant and returns the attribute value |
+| [`tenant_from_attribute`](#multitenancy-tenant_from_attribute){: #multitenancy-tenant_from_attribute } | `mfa` | `{Ash.Resource.Dsl, :identity, []}` | An mfa ({module, function, args}) pointing to a function that takes an attribute value and returns the tenant. This is the inverse of `parse_attribute`. |
 
 
 

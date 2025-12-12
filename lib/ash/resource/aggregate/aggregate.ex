@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Aggregate do
   @moduledoc "Represents a named aggregate on the resource that can be loaded"
   defstruct [
@@ -16,18 +20,20 @@ defmodule Ash.Resource.Aggregate do
     :sort,
     :default,
     :uniq?,
+    :multitenancy,
     include_nil?: false,
     join_filters: [],
     authorize?: true,
     filterable?: true,
     sortable?: true,
     sensitive?: false,
-    related?: true
+    related?: true,
+    __spark_metadata__: nil
   ]
 
   defmodule JoinFilter do
     @moduledoc "Represents a join filter on a resource aggregate"
-    defstruct [:relationship_path, :filter]
+    defstruct [:relationship_path, :filter, __spark_metadata__: nil]
   end
 
   @schema [
@@ -107,6 +113,14 @@ defmodule Ash.Resource.Aggregate do
       doc: """
       Whether or not the aggregate query should authorize based on the target action, if the parent query is authorized. Requires filter checks on the target action.
       """
+    ],
+    multitenancy: [
+      type: {:in, [:bypass]},
+      doc: """
+      Configures multitenancy behavior for the aggregate.
+
+      * `:bypass` - Aggregate data across all tenants, ignoring the tenant context even if it's set.
+      """
     ]
   ]
 
@@ -126,7 +140,9 @@ defmodule Ash.Resource.Aggregate do
           filterable?: boolean,
           sortable?: boolean,
           sensitive?: boolean,
-          related?: boolean
+          related?: boolean,
+          multitenancy: nil | :bypass,
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   @doc false

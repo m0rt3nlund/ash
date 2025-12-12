@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Query do
   @moduledoc """
   A data structure for reading data from a resource.
@@ -15,7 +19,7 @@ defmodule Ash.Query do
   |> Ash.read!()
 
   MyApp.Author
-  |> Ash.Query.aggregate(:published_post_count, :posts, query: [filter: [published: true]])
+  |> Ash.Query.aggregate(:published_post_count, :count, :posts, query: [filter: [published: true]])
   |> Ash.Query.sort(published_post_count: :desc)
   |> Ash.Query.limit(10)
   |> Ash.read!()
@@ -1756,7 +1760,7 @@ defmodule Ash.Query do
 
       right_filter = %{left_filter | expression: right_expression}
 
-      Ash.SatSolver.strict_filter_subset(left_filter, right_filter)
+      Ash.Filter.strict_subset(left_filter, right_filter)
     end
   end
 
@@ -1802,7 +1806,7 @@ defmodule Ash.Query do
         })
 
       left_filter = %{right_filter | expression: left_expression}
-      Ash.SatSolver.strict_filter_subset(left_filter, right_filter)
+      Ash.Filter.strict_subset(left_filter, right_filter)
     end
   end
 
@@ -2467,6 +2471,7 @@ defmodule Ash.Query do
                  authorize?: aggregate.authorize?,
                  sortable?: aggregate.sortable?,
                  sensitive?: aggregate.sensitive?,
+                 multitenancy: aggregate.multitenancy,
                  join_filters:
                    Map.new(aggregate.join_filters, &{&1.relationship_path, &1.filter}),
                  resource: aggregate.resource,
@@ -4117,7 +4122,7 @@ defmodule Ash.Query do
   Ash.Query.sort(query, calc(count(friends), :desc))
 
   # Specify a type (required in some cases when we can't determine a type)
-  Ash.Query.sort(query, [{calc(fragment("some_sql(?)", field, type: :string), :desc}])
+  Ash.Query.sort(query, [{calc(fragment("some_sql(?)", field), type: :string), :desc}])
   ```
 
   ## Sort Strings
@@ -4464,7 +4469,12 @@ defmodule Ash.Query do
         Map.update!(
           context,
           :data_layer,
-          &Map.put(&1, :previous_combination, opts[:previous_combination])
+          &Map.put(
+            &1,
+            :previous_combination,
+            opts[:previous_combination] &&
+              Ash.DataLayer.combination_acc(opts[:previous_combination], resource)
+          )
         )
       else
         context
@@ -4539,7 +4549,8 @@ defmodule Ash.Query do
                    Ash.DataLayer.combination_of(combinations, ash_query.resource, domain) do
               {:ok, query,
                %{
-                 previous_combination: previous,
+                 previous_combination:
+                   previous && Ash.DataLayer.combination_acc(previous, ash_query.resource),
                  combination_of_queries?: true,
                  combination_fieldset:
                    Enum.uniq(

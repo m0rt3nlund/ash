@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Actions.BulkCreateTest do
   @moduledoc false
   use ExUnit.Case, async: true
@@ -301,6 +305,37 @@ defmodule Ash.Test.Actions.BulkCreateTest do
 
       create :create_message do
         change ChangeMessage
+      end
+
+      create :create_with_nested_bulk_update do
+        change after_action(fn changeset, result, context ->
+                 other_posts = Post |> Ash.read!(tenant: changeset.tenant, authorize?: false)
+
+                 other_posts
+                 |> Enum.reject(fn post -> post.id == result.id end)
+                 |> Ash.bulk_update!(:update, %{title2: "nested_update"},
+                   notify?: true,
+                   strategy: :stream,
+                   return_records?: false,
+                   tenant: changeset.tenant,
+                   authorize?: false
+                 )
+
+                 {:ok, result}
+               end)
+      end
+
+      create :create_with_nested_bulk_create do
+        change after_action(fn changeset, result, context ->
+                 Ash.bulk_create!([%{title: "nested_post"}], Post, :create,
+                   notify?: true,
+                   return_records?: false,
+                   tenant: changeset.tenant,
+                   authorize?: false
+                 )
+
+                 {:ok, result}
+               end)
       end
     end
 
@@ -662,6 +697,41 @@ defmodule Ash.Test.Actions.BulkCreateTest do
              )
   end
 
+  test "runs after batch hooks with legacy data layers (no refs)" do
+    Application.put_env(:ash, :test_bulk_index_only, true)
+
+    try do
+      org =
+        Org
+        |> Ash.Changeset.for_create(:create, %{})
+        |> Ash.create!()
+
+      assert %Ash.BulkResult{
+               records: [%{title: "before_title1_after"}, %{title: "before_title2_after"}]
+             } =
+               Ash.bulk_create!(
+                 [%{title: "title1"}, %{title: "title2"}],
+                 Post,
+                 :create_with_after_batch,
+                 tenant: org.id,
+                 return_records?: true,
+                 sorted?: true,
+                 authorize?: false
+               )
+
+      assert %{title: "before_title_after"} =
+               Ash.create!(
+                 Post,
+                 %{title: "title"},
+                 action: :create_with_after_batch,
+                 tenant: org.id,
+                 authorize?: false
+               )
+    after
+      Application.delete_env(:ash, :test_bulk_index_only)
+    end
+  end
+
   test "will return error count" do
     org =
       Org
@@ -913,6 +983,43 @@ defmodule Ash.Test.Actions.BulkCreateTest do
       )
 
     assert result.records == []
+  end
+
+  test "returns skipped upserts when upsert_condition prevents update and return_skipped_upserts? is true" do
+    org =
+      Org
+      |> Ash.Changeset.for_create(:create, %{})
+      |> Ash.create!()
+
+    assert %Ash.BulkResult{records: [%{title: "title1", title2: "initial"}]} =
+             Ash.bulk_create!(
+               [%{title: "title1", title2: "initial"}],
+               Post,
+               :create,
+               tenant: org.id,
+               return_records?: true,
+               authorize?: false
+             )
+
+    result =
+      Ash.bulk_create(
+        [%{title: "title1", title2: "attempted_change"}],
+        Post,
+        :create,
+        tenant: org.id,
+        return_records?: true,
+        upsert?: true,
+        upsert_identity: :unique_title,
+        upsert_fields: [:title2],
+        upsert_condition: expr(false),
+        return_skipped_upsert?: true,
+        authorize?: false
+      )
+
+    assert %Ash.BulkResult{records: [returned_record]} = result
+    assert returned_record.title == "title1"
+    # The title2 should still be "initial" since the upsert was skipped
+    assert returned_record.title2 == "initial"
   end
 
   test "can upsert with :replace" do
@@ -1674,6 +1781,54 @@ defmodule Ash.Test.Actions.BulkCreateTest do
                before: nil,
                after: ^keyset
              } = tag.related_tags
+    end
+  end
+
+  describe "nested bulk operations" do
+    setup do
+      org =
+        Org
+        |> Ash.Changeset.for_create(:create, %{})
+        |> Ash.create!()
+
+      Ash.bulk_create!(
+        [%{title: "setup1"}, %{title: "setup2"}, %{title: "setup3"}],
+        Post,
+        :create,
+        return_stream?: true,
+        return_records?: true,
+        authorize?: false,
+        tenant: org.id
+      )
+      |> Enum.map(fn {:ok, result} -> result end)
+
+      {:ok, %{org: org}}
+    end
+
+    test "supports bulk_update in after_action callbacks", %{org: org} do
+      assert %Ash.BulkResult{} =
+               Ash.bulk_create!(
+                 [%{title: "trigger_nested"}],
+                 Post,
+                 :create_with_nested_bulk_update,
+                 notify?: true,
+                 return_records?: false,
+                 authorize?: false,
+                 tenant: org.id
+               )
+    end
+
+    test "supports bulk_create in after_action callbacks", %{org: org} do
+      assert %Ash.BulkResult{} =
+               Ash.bulk_create!(
+                 [%{title: "trigger_nested"}],
+                 Post,
+                 :create_with_nested_bulk_create,
+                 notify?: true,
+                 return_records?: false,
+                 authorize?: false,
+                 tenant: org.id
+               )
     end
   end
 

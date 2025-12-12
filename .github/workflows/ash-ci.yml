@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 name: Ash CI
 on:
   workflow_call:
@@ -68,8 +72,24 @@ on:
       community-files:
         type: boolean
         default: true
+      reuse:
+        type: boolean
+        default: false
+      mysql:
+        type: boolean
+        default: false
+      ash_mysql:
+        type: boolean
+        default: false
+      ecto_mysql:
+        type: boolean
+        default: false
+      mysql-version:
+        type: string
+        default: "8.0"
 env:
   PG_VERSION: ${{inputs.postgres-version}}
+  MYSQL_VERSION: ${{inputs.mysql-version}}
   ASH_CI_BUILD: true
 permissions:
   contents: read
@@ -81,7 +101,7 @@ jobs:
     # Only run this job when we're on the main branch, not for PRs
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: erlef/mix-dependency-submission@bdccfd60e12db8f77147dc6024758e459025f5ee # v1.2.1
     permissions:
       # Give the default GITHUB_TOKEN write permission to call the dependencies API
@@ -90,7 +110,7 @@ jobs:
     name: audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Update Elixir version in .tool-versions
         if: inputs.elixir-version != 'default'
         run: |
@@ -124,12 +144,12 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ inputs.community-files }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Check community files placement and content
         run: |
           EXIT_CODE=0
           # Check if files exist in root and fail if they do
-          for file in CODE_OF_CONDUCT.md CONTRIBUTING.md FUNDING.yml; do
+          for file in CODE_OF_CONDUCT.md FUNDING.yml; do
             if [ -f "$file" ]; then
               echo "❌ $file found in root directory. Please move it to .github/ directory."
               EXIT_CODE=1
@@ -145,7 +165,7 @@ jobs:
             }
           }
           # Check files in .github directory
-          for file in CODE_OF_CONDUCT.md CONTRIBUTING.md FUNDING.yml; do
+          for file in CODE_OF_CONDUCT.md FUNDING.yml; do
             filepath=".github/$file"
             if [ -f "$filepath" ]; then
               echo "✅ Found $file in .github directory"
@@ -220,7 +240,7 @@ jobs:
     name: MIX_ENV=test mix.compile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Update Elixir version in .tool-versions
         if: inputs.elixir-version != 'default'
         run: |
@@ -246,9 +266,12 @@ jobs:
             echo "erlang ${{ inputs.erlang-version }}" > .tool-versions
           fi
       - uses: team-alembic/staple-actions/actions/install-elixir@59199173e18eee6748b65d01626ef82d51c6e963 # main
-      - uses: team-alembic/staple-actions/actions/mix-compile@59199173e18eee6748b65d01626ef82d51c6e963 # main
+      - name: Set OS deps compile partition count
+        run: echo "MIX_OS_DEPS_COMPILE_PARTITION_COUNT=$(($(lscpu -p | grep -v '^#' | sort -u -t, -k 2,4 | wc -l) / 2))" >> $GITHUB_ENV
+      - uses: team-alembic/staple-actions/actions/mix-compile@04f27881d51ef973841fc40c549aefb7b52db7f7 # main
         with:
           mix-env: test
+          args: "--warnings-as-errors"
   build-docs:
     name: mix docs
     runs-on: ubuntu-latest
@@ -257,12 +280,12 @@ jobs:
       - build-test
       - spark-cheat-sheets
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-docs@59199173e18eee6748b65d01626ef82d51c6e963 # main
         with:
           mix-env: dev
           use-cache: false
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
           path: doc/
   deploy-docs:
@@ -288,7 +311,7 @@ jobs:
     needs: build-test
     if: ${{inputs.conventional-commit}}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: team-alembic/staple-actions/actions/conventional-commit@main
         with:
           mix-env: test
@@ -299,7 +322,7 @@ jobs:
     needs:
       - build-test
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-format@59199173e18eee6748b65d01626ef82d51c6e963 # main
         with:
           mix-env: test
@@ -310,7 +333,7 @@ jobs:
     needs:
       - build-test
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
         if: ${{inputs.spark-formatter}}
         with:
@@ -323,7 +346,7 @@ jobs:
     needs:
       - build-test
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
         if: ${{inputs.spark-cheat-sheets}}
         with:
@@ -340,7 +363,7 @@ jobs:
     needs:
       - build-test
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
         if: ${{inputs.sobelow}}
         with:
@@ -352,7 +375,7 @@ jobs:
     needs: build-test
     if: ${{inputs.doctor}}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: team-alembic/staple-actions/actions/mix-doctor@main
         with:
           mix-env: test
@@ -363,7 +386,7 @@ jobs:
     permissions:
       security-events: write
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-credo@59199173e18eee6748b65d01626ef82d51c6e963 # main
         with:
           mix-env: test
@@ -372,7 +395,7 @@ jobs:
         with:
           task: credo --format sarif > results.sarif
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@fca7ace96b7d713c7035871441bd52efbe39e27e # v3.28.19
+        uses: github/codeql-action/upload-sarif@0499de31b99561a6d14a36a5f662c2a54f91beee # v4.31.2
         with:
           sarif_file: results.sarif
           category: credo
@@ -383,7 +406,7 @@ jobs:
       - build-test
     if: ${{inputs.codegen}}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
         with:
           mix-env: test
@@ -394,7 +417,7 @@ jobs:
     needs:
       - build-test
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
         with:
           mix-env: test
@@ -412,7 +435,7 @@ jobs:
         id: dependabot-metadata
         uses: dependabot/fetch-metadata@08eff52bf64351f401fb50d4972fa95b9f2c2d1b # v2.4.0
         if: github.event.pull_request.user.login == 'dependabot[bot]'
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
@@ -422,7 +445,7 @@ jobs:
           task: igniter.upgrade --git-ci --yes
         if: github.event.pull_request.user.login == 'dependabot[bot]'
       - name: Commit Changes
-        uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 # v6.0.1
+        uses: stefanzweifel/git-auto-commit-action@28e16e81777b558cc906c8750092100bbb34c5e3 # v7.0.0
         if: github.event.pull_request.user.login == 'dependabot[bot]'
         with:
           commit_message: "[dependabot skip] Apply Igniter Upgrades"
@@ -446,8 +469,15 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      mysql:
+        image: mysql:${{inputs.mysql-version}}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+        ports:
+          - 3306:3306
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
         if: ${{inputs.postgres && inputs.ash_postgres}}
         with:
@@ -493,6 +523,36 @@ jobs:
           mix-env: test
           task: ash_sqlite.migrate
         if: ${{inputs.sqlite}}
+      - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
+        if: ${{inputs.mysql && inputs.ash_mysql}}
+        with:
+          mix-env: test
+          task: ash_mysql.generate_migrations --check
+      - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
+        with:
+          mix-env: test
+          task: ash_mysql.create
+        if: ${{inputs.mysql && inputs.ash_mysql}}
+      - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
+        with:
+          mix-env: test
+          task: ecto.create
+        if: ${{inputs.mysql && inputs.ecto_mysql}}
+      - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
+        with:
+          mix-env: test
+          task: ash_mysql.migrate
+        if: ${{inputs.mysql && inputs.ash_mysql}}
+      - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
+        with:
+          mix-env: test
+          task: ash_mysql.migrate
+        if: ${{inputs.mysql && inputs.ash_mysql}}
+      - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
+        with:
+          mix-env: test
+          task: ecto.migrate
+        if: ${{inputs.mysql && inputs.ecto_mysql}}
       - uses: team-alembic/staple-actions/actions/mix-test@59199173e18eee6748b65d01626ef82d51c6e963 # main
         with:
           mix-env: test
@@ -507,10 +567,19 @@ jobs:
     needs:
       - build-test
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-dialyzer@59199173e18eee6748b65d01626ef82d51c6e963 # main
         with:
           mix-env: dev
+
+  reuse:
+    name: REUSE compliance
+    runs-on: ubuntu-latest
+    if: ${{inputs.reuse}}
+    steps:
+      - uses: actions/checkout@v5
+      - name: REUSE compliance check
+        uses: fsfe/reuse-action@v6
 
   build-dev:
     name: MIX_ENV=dev mix.compile
@@ -518,7 +587,7 @@ jobs:
     needs:
       - build-test
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-compile@59199173e18eee6748b65d01626ef82d51c6e963 # main
         with:
           mix-env: dev
@@ -590,7 +659,7 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Extract crate information
         shell: bash
@@ -601,7 +670,7 @@ jobs:
         shell: bash
         run: |
           rustup target add ${{ matrix.job.target }}
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
         with:
           prefix-key: v0-precomp
           shared-key: ${{ matrix.job.target }}-${{ matrix.nif }}
@@ -621,13 +690,13 @@ jobs:
           cargo-args: ${{ matrix.job.cargo-args }}
 
       - name: Artifact upload
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: ${{ steps.build-crate.outputs.file-name }}
           path: ${{ steps.build-crate.outputs.file-path }}
 
       - name: Publish archives and packages
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
+        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2.4.1
         with:
           files: |
             ${{ steps.build-crate.outputs.file-path }}
@@ -654,7 +723,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Release
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: team-alembic/staple-actions/actions/mix-task@59199173e18eee6748b65d01626ef82d51c6e963 # main
         if: ${{inputs.rustler-precompiled-module}}
         with:

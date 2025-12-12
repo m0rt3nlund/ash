@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Reactor.Dsl.Destroy do
   @moduledoc """
   The `destroy` entity for the `Ash.Reactor` reactor extension.
@@ -24,7 +28,8 @@ defmodule Ash.Reactor.Dsl.Destroy do
             type: :destroy,
             undo_action: nil,
             undo: :never,
-            wait_for: []
+            wait_for: [],
+            __spark_metadata__: nil
 
   @type t :: %__MODULE__{
           __identifier__: any,
@@ -47,7 +52,8 @@ defmodule Ash.Reactor.Dsl.Destroy do
           type: :destroy,
           undo_action: atom,
           undo: :always | :never | :outside_transaction,
-          wait_for: [Reactor.Dsl.WaitFor.t()]
+          wait_for: [Reactor.Dsl.WaitFor.t()],
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   @doc false

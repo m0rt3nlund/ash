@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 spark_locals_without_parens = [
   accept: 1,
   access_type: 1,
@@ -30,6 +34,7 @@ spark_locals_without_parens = [
   atomic_update: 1,
   atomic_upgrade?: 1,
   atomic_upgrade_with: 1,
+  atomic_validation_default_target_attribute: 1,
   attribute: 1,
   attribute: 2,
   attribute: 3,
@@ -289,6 +294,7 @@ spark_locals_without_parens = [
   table: 1,
   tenant: 1,
   tenant: 2,
+  tenant_from_attribute: 1,
   through: 1,
   timeout: 1,
   to: 1,

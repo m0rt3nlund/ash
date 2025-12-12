@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Actions.LoadTest do
   @moduledoc false
   use ExUnit.Case, async: false
@@ -1292,6 +1296,14 @@ defmodule Ash.Test.Actions.LoadTest do
         |> Ash.read!()
 
       assert author.latest_post.id == post2.id
+    end
+
+    test "it throws an error when passing it an Ash.Query" do
+      assert_raise ArgumentError, ~r/Ash.load expects a record or records/, fn ->
+        Post
+        |> Ash.Query.for_read(:read)
+        |> Ash.load!(:latest_post)
+      end
     end
 
     test "loading belongs_to on resource without primary key returns correct result" do

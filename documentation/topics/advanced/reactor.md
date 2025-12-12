@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+
+SPDX-License-Identifier: MIT
+-->
+
 # Reactor
 
 `Ash.Reactor` is an extension for [`Reactor`](https://github.com/ash-project/reactor) which adds explicit support for interacting with resources via their defined actions.
@@ -25,7 +31,7 @@ Notes:
 
 - Every Reactor input must have a corresponding action argument.
 - Ash's action context is passed in as the Reactor's context (including things like actor, tenant, etc).
-- [Reactor runtime options](`t:Reactor.options/0`) can be set by setting `run {MyReactor, opts}` instead of just `run MyReactor`.
+- [Reactor runtime options](`t:Reactor.run_options/0`) can be set by setting `run {MyReactor, opts}` instead of just `run MyReactor`.
 - If you set the `transaction?` action DSL option to true then the Reactor will be run synchronously - regardless of the value of the `async?` runtime option.
 
 ### Example
@@ -164,7 +170,7 @@ semantics.
 The behaviour of the `undo_action` is action specific:
 
 - For `create` actions, the `undo_action` should be the name of a `destroy`
-  action with no specific requirements.
+  or `update` action with no specific requirements.
 - For `update` actions, the `undo_action` should also be an `update` action
   which takes a `changeset` argument, which will contain the `Ash.Changeset`
   which was used to execute the original update.

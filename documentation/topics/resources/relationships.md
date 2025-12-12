@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+
+SPDX-License-Identifier: MIT
+-->
+
 # Relationships
 
 Relationships describe the connections between resources and are a core
@@ -141,6 +147,41 @@ attribute on `MyApp.Profile` is `:user_id`.
 
 A `has_one` is similar to a `belongs_to` except the reference attribute is on
 the destination resource, instead of the source.
+
+`has_one` is specially useful when trying to load only one of a `has_many`. For example, to load the latest tweet.
+
+```elixir
+# on MyApp.User
+has_many :tweets, MyApp.Tweet
+
+has_one :latest_tweet, MyApp.Tweet do
+  sort inserted_at: :desc
+end
+
+# then load it
+iex> Ash.get!(User, 1, load: [:latest_tweet])
+# %User{id: 1, latest_tweet: %Tweet{id: 23}}
+
+```
+
+#### Enforcing Uniqueness
+
+If you are modelling a true one-to-one relationship, you will need to use an identity to create the constraint.
+
+```elixir
+# on MyApp.User
+has_one :profile, MyApp.Profile
+
+# on MyApp.Profile
+belongs_to :user, MyApp.User
+
+identities do
+  # Creates a unique constraint on the `user_id` foreign key
+  identity :user_id, [:user_id]
+end
+```
+
+See the [identities guide](/documentation/topics/resources/identities.md) for more.
 
 #### Attribute Defaults
 

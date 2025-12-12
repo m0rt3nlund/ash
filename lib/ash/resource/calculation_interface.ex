@@ -1,10 +1,21 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.CalculationInterface do
   @moduledoc """
   Represents a function that evaluates a calculation in a resource's code interface
   """
-  defstruct [:name, :calculation, args: [], exclude_inputs: [], custom_inputs: []]
+  defstruct [
+    :name,
+    :calculation,
+    args: [],
+    exclude_inputs: [],
+    custom_inputs: [],
+    __spark_metadata__: nil
+  ]
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{__spark_metadata__: Spark.Dsl.Entity.spark_meta()}
 
   @schema [
     name: [

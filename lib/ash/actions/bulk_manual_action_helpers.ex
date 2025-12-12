@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Actions.BulkManualActionHelpers do
   @moduledoc """
     Helper functions used for handling manual actions when used in bulk operations.
@@ -83,20 +87,28 @@ defmodule Ash.Actions.BulkManualActionHelpers do
     case result do
       {:ok, record} ->
         record =
-          Ash.Resource.put_metadata(
-            record,
+          record
+          |> Ash.Resource.put_metadata(
             metadata_index_name,
             changeset.context[bulk_action_type].index
+          )
+          |> Ash.Resource.put_metadata(
+            :bulk_action_ref,
+            changeset.context[bulk_action_type].ref
           )
 
         {:ok, record}
 
       {:ok, record, notifications} ->
         record =
-          Ash.Resource.put_metadata(
-            record,
+          record
+          |> Ash.Resource.put_metadata(
             metadata_index_name,
             changeset.context[bulk_action_type].index
+          )
+          |> Ash.Resource.put_metadata(
+            :bulk_action_ref,
+            changeset.context[bulk_action_type].ref
           )
 
         {:ok, record, notifications}

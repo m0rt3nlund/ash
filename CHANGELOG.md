@@ -1,6 +1,401 @@
+<!--
+SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+
+SPDX-License-Identifier: MIT
+-->
+
 # Changelog
 
 <!-- changelog -->
+
+## [v3.11.1](https://github.com/ash-project/ash/compare/v3.11.0...v3.11.1) (2025-12-06)
+
+
+
+
+### Bug Fixes:
+
+* handle has_one that return multiple records w/ no_attributes? by [@zachdaniel](https://github.com/zachdaniel)
+
+## [v3.11.0](https://github.com/ash-project/ash/compare/v3.10.1...v3.11.0) (2025-12-05)
+
+
+
+
+### Features:
+
+* aggregates: add multitenancy bypass option for aggregates (#2427) by [@shahryarjb](https://github.com/shahryarjb) [(#2427)](https://github.com/ash-project/ash/pull/2427)
+
+* aggregates: add multitenancy bypass option for aggregates by [@shahryarjb](https://github.com/shahryarjb) [(#2427)](https://github.com/ash-project/ash/pull/2427)
+
+### Bug Fixes:
+
+* Update `is_filter_check?(module)` to check for arity 3 (#2466) by A.S. Zwaan [(#2466)](https://github.com/ash-project/ash/pull/2466)
+
+* Ash.Reactor notification_metadata for bulk_create and bulk_update (#2449) by Christopher Bonhage [(#2449)](https://github.com/ash-project/ash/pull/2449)
+
+* keyset pagination now returns empty page at the end (#2464) by [@rapidfsub](https://github.com/rapidfsub) [(#2464)](https://github.com/ash-project/ash/pull/2464)
+
+* run after_transaction hook in all read failure cases (#2455) by Barnabas Jovanovics [(#2455)](https://github.com/ash-project/ash/pull/2455)
+
+### Improvements:
+
+* raise better error when passing Ash.Query to Ash.load (#2459) by StephanH90 [(#2459)](https://github.com/ash-project/ash/pull/2459)
+
+## [v3.10.1](https://github.com/ash-project/ash/compare/v3.10.0...v3.10.1) (2025-12-03)
+
+
+
+
+### Bug Fixes:
+
+* run after_transaction hook in all read failure cases (#2455) by [@barnabasJ](https://github.com/barnabasJ) [(#2455)](https://github.com/ash-project/ash/pull/2455)
+
+### Improvements:
+
+* raise better error when passing Ash.Query to Ash.load (#2459) by StephanH90 [(#2459)](https://github.com/ash-project/ash/pull/2459)
+
+## [v3.10.0](https://github.com/ash-project/ash/compare/v3.9.0...v3.10.0) (2025-11-25)
+
+
+
+
+### Features:
+
+* allow update actions for undo in reactor create steps (#2387) by [@barnabasJ](https://github.com/barnabasJ) [(#2387)](https://github.com/ash-project/ash/pull/2387)
+
+* calculation verifier (#2439) by [@barnabasJ](https://github.com/barnabasJ) [(#2439)](https://github.com/ash-project/ash/pull/2439)
+
+* add verifier to warn if load is used with expr calc by [@barnabasJ](https://github.com/barnabasJ) [(#2439)](https://github.com/ash-project/ash/pull/2439)
+
+### Bug Fixes:
+
+* only return `:ok` from reactors when actions have no return type by [@zachdaniel](https://github.com/zachdaniel)
+
+* respect read-action in rel check (#2448) by [@barnabasJ](https://github.com/barnabasJ) [(#2448)](https://github.com/ash-project/ash/pull/2448)
+
+* handle soft destroy return type in managed relationships by [@zachdaniel](https://github.com/zachdaniel)
+
+* Update typespec for deprecated `can/3` on domain (#2443) by [@Munksgaard](https://github.com/Munksgaard) [(#2443)](https://github.com/ash-project/ash/pull/2443)
+
+* error on non existend action (#2435) by [@barnabasJ](https://github.com/barnabasJ) [(#2435)](https://github.com/ash-project/ash/pull/2435)
+
+* provide context-aware error messages for manage_relationship on_no_match errors (#2415) by [@barnabasJ](https://github.com/barnabasJ) [(#2415)](https://github.com/ash-project/ash/pull/2415)
+
+### Improvements:
+
+* don't squish code interface double newlines by [@zachdaniel](https://github.com/zachdaniel)
+
+* significantly optimize code interface generation by [@zachdaniel](https://github.com/zachdaniel)
+
+* Allow overriding Ash.Type.NewType cast_input_array/2 (#2438) by Christopher Bonhage [(#2438)](https://github.com/ash-project/ash/pull/2438)
+
+* use regexes again now that otp 28.1 is out by [@zachdaniel](https://github.com/zachdaniel)
+
+## [v3.9.0](https://github.com/ash-project/ash/compare/v3.8.0...v3.9.0) (2025-11-09)
+
+
+
+
+### Features:
+
+* keep tenant in query when using :bypass and :bypass_all (#2429) by [@Malian](https://github.com/Malian) [(#2429)](https://github.com/ash-project/ash/pull/2429)
+
+### Bug Fixes:
+
+* added bulk_action_ref for changeset lookups (#2411) by Daniel Gollings [(#2411)](https://github.com/ash-project/ash/pull/2411)
+
+## [v3.8.0](https://github.com/ash-project/ash/compare/v3.7.6...v3.8.0) (2025-11-05)
+
+
+
+
+### Features:
+
+* tenant_from_attribute dsl option (#2412) by [@barnabasJ](https://github.com/barnabasJ) [(#2412)](https://github.com/ash-project/ash/pull/2412)
+
+### Bug Fixes:
+
+* use correct telemetry span name for notifier invocations by [@zachdaniel](https://github.com/zachdaniel)
+
+* ensure preserve_nil_values? constraint is taking into account in Struct type by [@Malian](https://github.com/Malian) [(#2414)](https://github.com/ash-project/ash/pull/2414)
+
+* Default tenant to changeset.tenant if not set (#2422) by [@shahryarjb](https://github.com/shahryarjb) [(#2422)](https://github.com/ash-project/ash/pull/2422)
+
+* retain calculation boundaries when expanding calculations in by [@zachdaniel](https://github.com/zachdaniel)
+
+* use atomic_upgrade_with for bulk destroys by [@zachdaniel](https://github.com/zachdaniel)
+
+* trailing bypass in policies (#2404) by [@maennchen](https://github.com/maennchen) [(#2404)](https://github.com/ash-project/ash/pull/2404)
+
+### Improvements:
+
+* Add preserve_nil_values? to map and struct types (#2414) by [@Malian](https://github.com/Malian) [(#2414)](https://github.com/ash-project/ash/pull/2414)
+
+* enable configuring match v4 uuids for v7 uuids (#2416) by Kenneth Kostrešević [(#2416)](https://github.com/ash-project/ash/pull/2416)
+
+## [v3.7.6](https://github.com/ash-project/ash/compare/v3.7.5...v3.7.6) (2025-10-19)
+
+
+
+
+### Bug Fixes:
+
+* ensure attribute used in atomic update is casted fully by [@zachdaniel](https://github.com/zachdaniel)
+
+## [v3.7.5](https://github.com/ash-project/ash/compare/v3.7.4...v3.7.5) (2025-10-19)
+
+
+### Bug Fixes:
+
+* revert changes to bulk action index context/metadata keys
+
+
+## [v3.7.4](https://github.com/ash-project/ash/compare/v3.7.3...v3.7.4) (2025-10-19)
+
+### Bug Fixes:
+
+* ensure that a filter vs forbidden response is correctly deteermined by [@zachdaniel]
+
+(not a security issue, only affects the response type)
+
+
+## [v3.7.3](https://github.com/ash-project/ash/compare/v3.7.2...v3.7.3) (2025-10-19)
+
+
+
+
+### Bug Fixes:
+
+* don't re-cast atomic updates when adding validations by [@zachdaniel](https://github.com/zachdaniel)
+
+* ensure calculation contexts include changes from before_transaction hooks by [@zachdaniel](https://github.com/zachdaniel)
+
+### Improvements:
+
+* Simplify forbidden_due_to_strict_policy check (#2400) by [@maennchen](https://github.com/maennchen)
+
+## [v3.7.2](https://github.com/ash-project/ash/compare/v3.7.1...v3.7.2) (2025-10-18)
+
+
+
+
+### Bug Fixes:
+
+* update crux for proper eager check evaluation by [@zachdaniel](https://github.com/zachdaniel)
+
+* clear metadata before for_update and for_destroy actions (#2362) by bipasamaji
+
+* ensure that we detect filter checks failing statically by [@zachdaniel](https://github.com/zachdaniel)
+
+* use *last* changing attribute for atomic validation target by [@zachdaniel](https://github.com/zachdaniel)
+
+## [v3.7.1](https://github.com/ash-project/ash/compare/v3.7.0...v3.7.1) (2025-10-17)
+
+
+
+
+### Bug Fixes:
+
+* normalize bulk index metadata before returning by [@zachdaniel](https://github.com/zachdaniel)
+
+* reuse type constraints when matching relationship records (#2391) by Hannes Wüthrich
+
+## [v3.7.0](https://github.com/ash-project/ash/compare/v3.6.3...v3.7.0) (2025-10-15)
+
+
+
+
+### Features:
+
+* Refactor SAT Solver into `crux` (#2375) by [@maennchen](https://github.com/maennchen)
+
+### Improvements:
+
+* Add combination_acc callback to DataLayer behaviour by [@zachdaniel](https://github.com/zachdaniel)
+
+## [v3.6.3](https://github.com/ash-project/ash/compare/v3.6.2...v3.6.3) (2025-10-15)
+
+
+
+
+### Bug Fixes:
+
+* use `fields` key in atomic errors when exception has fields by [@zachdaniel](https://github.com/zachdaniel)
+
+* use is_nil in ets upsert filter if the value is nil (#2363) by [@barnabasJ](https://github.com/barnabasJ)
+
+* bypass field policy with condition (#2369) by [@maennchen](https://github.com/maennchen)
+
+### Improvements:
+
+* optimize Ash.Resource.Igniter.list_resources and Ash.Domain.Igniter.list_domains for large codebases (#2371) by Elliot Bowes
+
+* optimize list_resources and list_domains for large codebases by Elliot Bowes
+
+* Improve SatSolver.simplify_expression/1 (#2367) by [@maennchen](https://github.com/maennchen)
+
+* Policy Refactoring (#2365) by [@maennchen](https://github.com/maennchen)
+
+## [v3.6.2](https://github.com/ash-project/ash/compare/v3.6.1...v3.6.2) (2025-10-10)
+
+
+
+
+### Bug Fixes:
+
+* properly apply bypass policies that can never pass by [@maennchen](https://github.com/maennchen)
+resolves CVE-2025-48043
+
+## [v3.6.1](https://github.com/ash-project/ash/compare/v3.6.0...v3.6.1) (2025-10-10)
+
+
+
+
+### Bug Fixes:
+
+* only add field to error function if not already present by [@zachdaniel](https://github.com/zachdaniel)
+
+## [v3.6.0](https://github.com/ash-project/ash/compare/v3.5.43...v3.6.0) (2025-10-10)
+
+
+
+
+### Features:
+
+* Improve selection of atomic validation attribute, including resource-level option (#2356) by [@stevebrambilla](https://github.com/stevebrambilla)
+
+* data_one_of validation (#2358) by [@barnabasJ](https://github.com/barnabasJ)
+
+* add `Ash.transact/3` (#2341) by [@barnabasJ](https://github.com/barnabasJ)
+
+### Bug Fixes:
+
+* don't stringify fieldset atoms in read action by [@zachdaniel](https://github.com/zachdaniel)
+
+* extended context collision prevention to all bulk operation types and added convenience helpers (#2357) by Daniel Gollings
+
+* improve nested bulk action notification handling (#2353) by Daniel Gollings
+
+* Ash.Query.after_transaction result argument issues. (#2354) by James Harton
+
+* after_transaction on read error bug. by James Harton
+
+* correct after_transaction result type for successful queries. by James Harton
+
+* properly set defaults when using string keys in typed structs by [@zachdaniel](https://github.com/zachdaniel)
+
+* move rollback_on_error logic to DataLayer.transaction by [@barnabasJ](https://github.com/barnabasJ)
+
+* handle return_skipped_upsert? in bulk creates (#2343) by [@barnabasJ](https://github.com/barnabasJ)
+
+* Incorrect return type checking for generic action hooks (#2352) by James Harton
+
+* remove non public arguments in generator action_input (#2350) by Minsub Kim
+
+* handle atomic_refs in bulk upserts (#2342) by [@barnabasJ](https://github.com/barnabasJ)
+
+* fix with_transaction bug in Mnesia data layer (#2340) by Dan Wanek
+
+* properly retrieve `parent` relationship paths out of `exists` by [@zachdaniel](https://github.com/zachdaniel)
+
+### Improvements:
+
+* add can? callback for return_skipped_upsert? for bulk by [@barnabasJ](https://github.com/barnabasJ)
+
+## [v3.5.43](https://github.com/ash-project/ash/compare/v3.5.42...v3.5.43) (2025-09-28)
+
+
+
+
+### Bug Fixes:
+
+* cast value to type when requiring atomic attributes by [@zachdaniel](https://github.com/zachdaniel)
+
+* fix amnesia support for upsets by Dan Wanek
+
+* support top-level `:shared` key in `Ash.Scope.ToOpts` for `Map` (#2261) by James Harton
+
+### Improvements:
+
+* add bulk_create for Ash.DataLayer.Mnesia (#2336) by Dan Wanek
+
+* return errors from calculations with invalid expressions by [@zachdaniel](https://github.com/zachdaniel)
+
+* add source locations to a whole bunch of errors by [@zachdaniel](https://github.com/zachdaniel)
+
+* add location to primary key verifier by [@zachdaniel](https://github.com/zachdaniel)
+
+* add location for multitenancy verifier by [@zachdaniel](https://github.com/zachdaniel)
+
+* add location information for manage relationship transformer by [@zachdaniel](https://github.com/zachdaniel)
+
+* add location info for reserved field names transformer by [@zachdaniel](https://github.com/zachdaniel)
+
+* add location info for primary action transformer by [@zachdaniel](https://github.com/zachdaniel)
+
+* add location info for unique action name transformer by [@zachdaniel](https://github.com/zachdaniel)
+
+* implemented 'has' and 'intersects' functions (#2324) by Abdessabour Moutik
+
+## [v3.5.42](https://github.com/ash-project/ash/compare/v3.5.41...v3.5.42) (2025-09-20)
+
+
+
+
+### Improvements:
+
+* use `delay_task` for `mix ash.setup` by [@zachdaniel](https://github.com/zachdaniel)
+
+## [v3.5.41](https://github.com/ash-project/ash/compare/v3.5.40...v3.5.41) (2025-09-20)
+
+
+
+
+### Bug Fixes:
+
+* use explicit `is_nil` check for `upsert_condition` by [@zachdaniel](https://github.com/zachdaniel)
+
+* actually use the mnesia table configured ð¤¦ââï¸ by [@zachdaniel](https://github.com/zachdaniel)
+
+* add missing capabilities to data layer spec by [@zachdaniel](https://github.com/zachdaniel)
+
+* Typo in scope documentation (#2328) by [@Munksgaard](https://github.com/Munksgaard)
+
+* properly pass action to requires_original_data? in VerifyActionsAtomic (#2327) by Christopher Bonhage
+
+* avoid crashing on new exception (#2322) by Cyprien Poisson
+
+* handle validation init errors without overriding them with validation message (#2320) by marot
+
+### Improvements:
+
+* add `--setup` flag to `ash.install` to run `ash.setup` by [@zachdaniel](https://github.com/zachdaniel)
+
+* Improve performance of mix tasks that load extensions (#2332) by drtheuns
+
+* better error message on invalid relationship paths in exists by [@zachdaniel](https://github.com/zachdaniel)
+
+* add `any` builtin validation by [@zachdaniel](https://github.com/zachdaniel)
+
+* detect types in `get_path` expressions by [@zachdaniel](https://github.com/zachdaniel)
+
+## [v3.5.40](https://github.com/ash-project/ash/compare/v3.5.39...v3.5.40) (2025-09-13)
+
+
+
+
+### Bug Fixes:
+
+* Make Ash.Type.Keyword.dump_to_native return a map. (#2318) by Torkild Gundersen Kjevik
+
+* nif rustler_precompiled: update targets to ubuntu-22.04 and extend release list to prevent stuck builds by Shahryar Tavakkoli
+
+* update targets to ubuntu-22.04 and extend release list to prevent stuck builds (#2311) by Shahryar Tavakkoli
+
+* Runtime upsert_fields option is not passed to data layer in certain cases (#2310) by jlgeering
+
+* if nils_distinct?, consider multitenancy attribute as an upsert key by Zach Daniel
 
 ## [v3.5.39](https://github.com/ash-project/ash/compare/v3.5.38...v3.5.39) (2025-09-06)
 

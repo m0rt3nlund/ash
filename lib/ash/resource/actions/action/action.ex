@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Actions.Action do
   @moduledoc "Represents a custom action on a resource."
 
@@ -15,7 +19,8 @@ defmodule Ash.Resource.Actions.Action do
     transaction?: false,
     primary?: false,
     skip_global_validations?: false,
-    type: :action
+    type: :action,
+    __spark_metadata__: nil
   ]
 
   @type t :: %__MODULE__{
@@ -32,7 +37,8 @@ defmodule Ash.Resource.Actions.Action do
           primary?: boolean,
           transaction?: boolean,
           preparations: [Ash.Resource.Preparation.t()],
-          skip_global_validations?: boolean
+          skip_global_validations?: boolean,
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   import Ash.Resource.Actions.SharedOptions

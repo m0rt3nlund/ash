@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Validation do
   @moduledoc """
   Represents a validation in Ash.
@@ -25,7 +29,8 @@ defmodule Ash.Resource.Validation do
     :before_action?,
     :where,
     :always_atomic?,
-    on: []
+    on: [],
+    __spark_metadata__: nil
   ]
 
   require Ash.BehaviourHelpers
@@ -37,7 +42,8 @@ defmodule Ash.Resource.Validation do
           only_when_valid?: boolean(),
           description: String.t() | nil,
           where: list({atom(), list(atom())}),
-          on: list(atom())
+          on: list(atom()),
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   @type path :: [atom | integer]
@@ -201,17 +207,6 @@ defmodule Ash.Resource.Validation do
 
   @doc false
   def transform(%{validation: {module, opts}} = validation) do
-    opts =
-      Enum.map(opts, fn
-        {key, %Regex{} = value} when module == Ash.Resource.Validation.Match ->
-          source = Regex.source(value)
-          opts = Regex.opts(value)
-          {key, {Spark.Regex, :cache, [source, opts]}}
-
-        {key, value} ->
-          {key, value}
-      end)
-
     {:ok,
      %{
        validation

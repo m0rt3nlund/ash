@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Domain.Dsl do
   @domain %Spark.Dsl.Section{
     name: :domain,
@@ -78,11 +82,12 @@ defmodule Ash.Domain.Dsl do
 
   defmodule ResourceReference do
     @moduledoc "A resource reference in a domain"
-    defstruct [:resource, definitions: []]
+    defstruct [:resource, :__spark_metadata__, definitions: []]
 
     @type t :: %__MODULE__{
             resource: module(),
-            definitions: list(Ash.Resource.Interface.t() | Ash.Resource.CalculationInterface.t())
+            definitions: list(Ash.Resource.Interface.t() | Ash.Resource.CalculationInterface.t()),
+            __spark_metadata__: Spark.Dsl.Entity.spark_meta()
           }
   end
 

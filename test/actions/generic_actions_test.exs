@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Actions.GenericActionsTest do
   @moduledoc false
   use ExUnit.Case, async: true
@@ -588,6 +592,18 @@ defmodule Ash.Test.Actions.GenericActionsTest do
 
       assert result == "Processed: test_first_second"
     end
+
+    test "after_action hook works with untyped action (no return value)" do
+      result =
+        Post
+        |> Ash.ActionInput.for_action(:untyped_without_value, %{})
+        |> Ash.ActionInput.after_action(fn _input, nil ->
+          :ok
+        end)
+        |> Ash.run_action!()
+
+      assert result == :ok
+    end
   end
 
   describe "full lifecycle integration on generic actions" do
@@ -1032,6 +1048,33 @@ defmodule Ash.Test.Actions.GenericActionsTest do
         end)
         |> Ash.run_action!()
       end
+    end
+
+    test "after_transaction hook works with untyped action (no return value)" do
+      result =
+        Post
+        |> Ash.ActionInput.for_action(:untyped_without_value, %{})
+        |> Ash.ActionInput.after_transaction(fn _input, :ok ->
+          :ok
+        end)
+        |> Ash.run_action!()
+
+      assert result == :ok
+    end
+
+    test "around_transaction hook works with untyped action (no return value)" do
+      result =
+        Post
+        |> Ash.ActionInput.for_action(:untyped_without_value, %{})
+        |> Ash.ActionInput.around_transaction(fn input, callback ->
+          case callback.(input) do
+            :ok -> :ok
+            error -> error
+          end
+        end)
+        |> Ash.run_action!()
+
+      assert result == :ok
     end
   end
 end

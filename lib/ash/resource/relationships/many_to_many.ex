@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Relationships.ManyToMany do
   @moduledoc "Represents a many_to_many relationship on a resource"
   defstruct [
@@ -29,7 +33,8 @@ defmodule Ash.Resource.Relationships.ManyToMany do
     could_be_related_at_creation?: false,
     validate_destination_attribute?: true,
     cardinality: :many,
-    type: :many_to_many
+    type: :many_to_many,
+    __spark_metadata__: nil
   ]
 
   @type t :: %__MODULE__{
@@ -53,7 +58,8 @@ defmodule Ash.Resource.Relationships.ManyToMany do
           destination_attribute_on_join_resource: atom,
           sort: Keyword.t() | nil,
           default_sort: Keyword.t() | nil,
-          description: String.t()
+          description: String.t(),
+          __spark_metadata__: Spark.Dsl.Entity.spark_meta()
         }
 
   import Ash.Resource.Relationships.SharedOptions

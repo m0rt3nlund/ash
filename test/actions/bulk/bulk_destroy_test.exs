@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Actions.BulkDestroyTest do
   @moduledoc false
   use ExUnit.Case, async: false
@@ -200,6 +204,57 @@ defmodule Ash.Test.Actions.BulkDestroyTest do
       end
 
       destroy :forbidden_destroy do
+      end
+
+      destroy :destroy_with_nested_bulk_create do
+        require_atomic? false
+
+        change after_action(fn changeset, result, context ->
+                 Ash.bulk_create!([%{title: "nested_post"}], Post, :create,
+                   notify?: true,
+                   return_records?: false,
+                   tenant: changeset.tenant,
+                   authorize?: false
+                 )
+
+                 {:ok, result}
+               end)
+      end
+
+      destroy :destroy_with_nested_bulk_update do
+        require_atomic? false
+
+        change after_action(fn changeset, result, context ->
+                 other_posts = Post |> Ash.read!(tenant: changeset.tenant, authorize?: false)
+
+                 other_posts
+                 |> Enum.take(2)
+                 |> Ash.bulk_update!(:update, %{title2: "nested_update"},
+                   notify?: true,
+                   return_records?: false,
+                   authorize?: false
+                 )
+
+                 {:ok, result}
+               end)
+      end
+
+      destroy :destroy_with_nested_bulk_destroy do
+        require_atomic? false
+
+        change after_action(fn changeset, result, context ->
+                 other_posts = Post |> Ash.read!(tenant: changeset.tenant, authorize?: false)
+
+                 other_posts
+                 |> Enum.take(1)
+                 |> Ash.bulk_destroy!(:destroy, %{},
+                   notify?: true,
+                   return_records?: false,
+                   authorize?: false
+                 )
+
+                 {:ok, result}
+               end)
       end
     end
 
@@ -491,6 +546,39 @@ defmodule Ash.Test.Actions.BulkDestroyTest do
              end)
 
     assert [] = Ash.read!(Post)
+  end
+
+  test "runs after batch hooks with legacy data layers (no refs)" do
+    Application.put_env(:ash, :test_bulk_index_only, true)
+
+    try do
+      assert %Ash.BulkResult{
+               records: [
+                 %{title: "title1_after"},
+                 %{title: "title2_after"}
+               ]
+             } =
+               Ash.bulk_create!([%{title: "title1"}, %{title: "title2"}], Post, :create,
+                 return_stream?: true,
+                 return_records?: true
+               )
+               |> Stream.map(fn {:ok, result} ->
+                 result
+               end)
+               |> Ash.bulk_destroy!(:destroy_with_after_batch, %{},
+                 resource: Post,
+                 strategy: [:atomic],
+                 return_records?: true,
+                 return_errors?: true
+               )
+               |> Map.update!(:records, fn records ->
+                 Enum.sort_by(records, & &1.title)
+               end)
+
+      assert [] = Ash.read!(Post)
+    after
+      Application.delete_env(:ash, :test_bulk_index_only)
+    end
   end
 
   test "will return errors on request" do
@@ -830,6 +918,59 @@ defmodule Ash.Test.Actions.BulkDestroyTest do
                )
 
       assert [%Post{title: "Related 1"}, %Post{title: "Related 2"}] = post.related_posts
+    end
+  end
+
+  describe "nested bulk operations" do
+    setup do
+      posts =
+        Ash.bulk_create!(
+          [%{title: "setup1"}, %{title: "setup2"}, %{title: "setup3"}],
+          Post,
+          :create,
+          return_stream?: true,
+          return_records?: true,
+          authorize?: false
+        )
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      {:ok, %{posts: posts}}
+    end
+
+    test "supports bulk_create in after_action callbacks", %{posts: posts} do
+      post_to_destroy = List.first(posts)
+
+      assert %Ash.BulkResult{} =
+               Ash.bulk_destroy!([post_to_destroy], :destroy_with_nested_bulk_create, %{},
+                 notify?: true,
+                 return_records?: false,
+                 authorize?: false,
+                 strategy: [:stream]
+               )
+    end
+
+    test "supports bulk_update in after_action callbacks", %{posts: posts} do
+      post_to_destroy = List.first(posts)
+
+      assert %Ash.BulkResult{} =
+               Ash.bulk_destroy!([post_to_destroy], :destroy_with_nested_bulk_update, %{},
+                 notify?: true,
+                 return_records?: false,
+                 authorize?: false,
+                 strategy: [:stream]
+               )
+    end
+
+    test "supports bulk_destroy in after_action callbacks", %{posts: posts} do
+      [post_to_destroy | _] = posts
+
+      assert %Ash.BulkResult{} =
+               Ash.bulk_destroy!([post_to_destroy], :destroy_with_nested_bulk_destroy, %{},
+                 notify?: true,
+                 return_records?: false,
+                 authorize?: false,
+                 strategy: [:stream]
+               )
     end
   end
 end

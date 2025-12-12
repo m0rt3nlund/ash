@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Change do
   @moduledoc """
   The behaviour for an action-specific resource change.
@@ -9,11 +13,19 @@ defmodule Ash.Resource.Change do
   when this change was configured on a resource, and the context, which currently only has
   the actor.
   """
-  defstruct [:change, :on, :only_when_valid?, :description, :always_atomic?, where: []]
+  defstruct [
+    :change,
+    :on,
+    :only_when_valid?,
+    :description,
+    :always_atomic?,
+    where: [],
+    __spark_metadata__: nil
+  ]
 
   require Ash.BehaviourHelpers
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{__spark_metadata__: Spark.Dsl.Entity.spark_meta()}
   @type ref :: {module(), Keyword.t()} | module()
 
   @doc false

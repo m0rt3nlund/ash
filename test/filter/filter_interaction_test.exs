@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Test.Filter.FilterInteractionTest do
   use ExUnit.Case, async: false
 
@@ -63,6 +67,10 @@ defmodule Ash.Test.Filter.FilterInteractionTest do
   defmodule PostLink do
     @moduledoc false
     use Ash.Resource, domain: Domain, data_layer: Ash.DataLayer.Mnesia
+
+    mnesia do
+      table :post_link
+    end
 
     actions do
       default_accept :*

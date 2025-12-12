@@ -1,9 +1,14 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Resource.Transformers.BelongsToAttribute do
   @moduledoc """
   Creates the attribute for belongs_to relationships that have `define_attribute?: true`
   """
   use Spark.Dsl.Transformer
 
+  alias Spark.Dsl.Entity
   alias Spark.Dsl.Transformer
   alias Spark.Error.DslError
 
@@ -12,12 +17,10 @@ defmodule Ash.Resource.Transformers.BelongsToAttribute do
 
   def transform(dsl_state) do
     dsl_state
-    |> Transformer.get_entities([:relationships])
+    |> Ash.Resource.Info.relationships()
     |> Enum.filter(&(&1.type == :belongs_to && &1.define_attribute?))
     |> Enum.reject(fn relationship ->
-      dsl_state
-      |> Transformer.get_entities([:attributes])
-      |> Enum.find(&(Map.get(&1, :name) == relationship.source_attribute))
+      Ash.Resource.Info.attribute(dsl_state, relationship.source_attribute)
     end)
     |> Enum.reduce_while({:ok, dsl_state}, fn relationship, {:ok, dsl_state} ->
       entity =
@@ -52,11 +55,13 @@ defmodule Ash.Resource.Transformers.BelongsToAttribute do
   defp add_entity({:ok, attribute}, dsl_state, _relationship),
     do: {:cont, {:ok, Transformer.add_entity(dsl_state, [:attributes], attribute, type: :append)}}
 
-  defp add_entity({:error, error}, _dsl_state, relationship),
+  defp add_entity({:error, error}, dsl_state, relationship),
     do:
       {:halt,
        {:error,
         DslError.exception(
+          module: Transformer.get_persisted(dsl_state, :module),
+          location: Entity.anno(relationship),
           message:
             "Could not create attribute for belongs_to #{relationship.name}: #{inspect(error)}",
           path: [:relationships, relationship.name]

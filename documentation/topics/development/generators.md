@@ -1,6 +1,12 @@
+<!--
+SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+
+SPDX-License-Identifier: MIT
+-->
+
 # Generators
 
-Ash comes with multiple generators, packages as mix tasks, to help you generate and make modifications to your applications.
+Ash comes with multiple generators, packaged as mix tasks, to help you generate and make modifications to your applications.
 
 See the documentation for each mix task for more information. What is presented here is merely an overview.
 

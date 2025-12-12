@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 ash contributors <https://github.com/ash-project/ash/graphs.contributors>
+#
+# SPDX-License-Identifier: MIT
+
 defmodule Ash.Type do
   @array_constraints [
     min_length: [
@@ -163,7 +167,7 @@ defmodule Ash.Type do
       doc: "Enforces a minimum length on the value"
     ],
     match: [
-      type: :regex_as_mfa,
+      type: :regex,
       doc: "Enforces that the string matches a passed in regex"
     ],
     trim?: [type: :boolean, doc: "Trims the value.", default: true],
